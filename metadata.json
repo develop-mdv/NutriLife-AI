@@ -1,0 +1,9 @@
+{
+  "name": "NutriLife AI",
+  "description": "Умный трекер питания и фитнеса на базе Gemini. Отслеживайте еду по фото, общайтесь с тренером по здоровью и следуйте персональному плану оздоровления.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
