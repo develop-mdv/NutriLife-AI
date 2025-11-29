@@ -1,7 +1,8 @@
-import React from 'react';
-import { Card, ProgressBar } from './UI';
+
+import React, { useState, useMemo } from 'react';
+import { Card, ProgressBar, Input } from './UI';
 import { UserProfile, Macros, FoodEntry } from '../types';
-import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 
 interface DashboardProps {
   profile: UserProfile;
@@ -36,9 +37,38 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onAddWater,
   onToggleReminders
 }) => {
+  const [expandedFoodId, setExpandedFoodId] = useState<string | null>(null);
+  
+  // Toggle for Calorie Ring (Left vs Consumed)
+  const [showConsumed, setShowConsumed] = useState(false);
+
+  // Filter state
+  const [filterType, setFilterType] = useState<'today' | 'week' | 'custom'>('today');
+  const [dateRange, setDateRange] = useState({ start: '', end: '' });
+
   // Goal - Food + Activity
   const caloriesLeft = Math.max(0, profile.dailyCalorieGoal - todayMacros.calories + burnedCalories);
+  const caloriesConsumed = Math.round(todayMacros.calories);
   
+  // Calculate Macro Goals based on Profile Goal
+  const macroGoals = useMemo(() => {
+    const cals = profile.dailyCalorieGoal;
+    // Ratios: Protein/Fat/Carbs
+    let ratio = { p: 0.25, f: 0.25, c: 0.5 }; // Default (Balance)
+
+    if (profile.goal === 'lose_weight') {
+      ratio = { p: 0.40, f: 0.30, c: 0.30 }; // High protein for satiety
+    } else if (profile.goal === 'gain_muscle') {
+      ratio = { p: 0.30, f: 0.20, c: 0.50 }; // Moderate protein, high carb
+    }
+
+    return {
+      protein: Math.round((cals * ratio.p) / 4), // 4 kcal per gram
+      fat: Math.round((cals * ratio.f) / 9),     // 9 kcal per gram
+      carbs: Math.round((cals * ratio.c) / 4)    // 4 kcal per gram
+    };
+  }, [profile.dailyCalorieGoal, profile.goal]);
+
   const macroData = [
     { name: 'Белки', value: todayMacros.protein, color: '#34D399' }, // Emerald
     { name: 'Жиры', value: todayMacros.fat, color: '#FBBF24' }, // Amber
@@ -49,7 +79,51 @@ export const Dashboard: React.FC<DashboardProps> = ({
     ? [{ name: 'Empty', value: 1, color: '#E5E7EB' }] 
     : macroData;
 
-  const waterPercent = Math.min(100, Math.round((waterIntake / waterGoal) * 100));
+  // Filter Logic
+  const filteredFoodEntries = useMemo(() => {
+    const now = new Date();
+    // Start of today (00:00:00)
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+    return foodEntries.filter(entry => {
+        const entryTime = new Date(entry.timestamp).getTime();
+
+        if (filterType === 'today') {
+            return entryTime >= todayStart;
+        }
+        if (filterType === 'week') {
+            const weekStart = todayStart - (6 * 24 * 60 * 60 * 1000); // Last 7 days including today
+            return entryTime >= weekStart;
+        }
+        if (filterType === 'custom') {
+            if (!dateRange.start || !dateRange.end) return true;
+            
+            // Parse inputs (YYYY-MM-DD) to local time
+            const sParts = dateRange.start.split('-').map(Number);
+            const start = new Date(sParts[0], sParts[1]-1, sParts[2]).getTime();
+            
+            const eParts = dateRange.end.split('-').map(Number);
+            // End of the end date
+            const end = new Date(eParts[0], eParts[1]-1, eParts[2], 23, 59, 59, 999).getTime();
+            
+            return entryTime >= start && entryTime <= end;
+        }
+        return true;
+    }).sort((a, b) => b.timestamp - a.timestamp); // Sort newest first
+  }, [foodEntries, filterType, dateRange]);
+
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-white p-2 border border-gray-100 shadow-md rounded-lg text-xs">
+          <p className="font-bold mb-1" style={{color: data.fill}}>{data.name}</p>
+          <p>{Math.round(data.amount)}г ({Math.round(data.percent)}% от нормы)</p>
+        </div>
+      );
+    }
+    return null;
+  };
 
   return (
     <div className="space-y-6 pb-24">
@@ -67,7 +141,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {/* Main Calorie Ring */}
       <Card className="flex flex-col items-center justify-center py-6 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-400 via-amber-400 to-blue-400"></div>
-        <div className="relative h-56 w-full">
+        <div 
+          onClick={() => setShowConsumed(!showConsumed)}
+          className="relative h-56 w-full cursor-pointer active:scale-95 transition-transform duration-200"
+          title="Нажмите, чтобы переключить вид"
+        >
            <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
@@ -85,12 +163,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </Pie>
             </PieChart>
            </ResponsiveContainer>
-           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-             <span className="text-4xl font-bold text-gray-800 tracking-tight">{Math.round(caloriesLeft)}</span>
-             <span className="text-xs text-gray-400 font-medium uppercase tracking-wider mb-1">ккал ост.</span>
-             {burnedCalories > 0 && (
+           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none">
+             <span className="text-4xl font-bold text-gray-800 tracking-tight">
+                {showConsumed ? caloriesConsumed : Math.round(caloriesLeft)}
+             </span>
+             <span className="text-xs text-gray-400 font-medium uppercase tracking-wider mb-1">
+                {showConsumed ? 'ккал съедено' : 'ккал ост.'}
+             </span>
+             {!showConsumed && burnedCalories > 0 && (
                <span className="text-xs text-orange-500 font-semibold bg-orange-50 px-2 py-0.5 rounded-full">
                  +{burnedCalories} сожжено
+               </span>
+             )}
+              {showConsumed && (
+               <span className="text-xs text-gray-400 font-medium">
+                 из {profile.dailyCalorieGoal}
                </span>
              )}
            </div>
@@ -100,17 +187,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
            <div className="flex flex-col items-center">
              <div className="w-2 h-2 rounded-full bg-emerald-400 mb-1"></div>
              <div className="text-xs text-gray-400 uppercase font-bold">Белки</div>
-             <div className="font-bold text-gray-800 text-lg">{Math.round(todayMacros.protein)}г</div>
+             <div className="font-bold text-gray-800 text-lg leading-none mt-1">
+                 {Math.round(todayMacros.protein)}
+                 <span className="text-xs text-gray-400 font-medium ml-0.5">/{macroGoals.protein}г</span>
+             </div>
            </div>
            <div className="flex flex-col items-center">
              <div className="w-2 h-2 rounded-full bg-amber-400 mb-1"></div>
              <div className="text-xs text-gray-400 uppercase font-bold">Жиры</div>
-             <div className="font-bold text-gray-800 text-lg">{Math.round(todayMacros.fat)}г</div>
+             <div className="font-bold text-gray-800 text-lg leading-none mt-1">
+                {Math.round(todayMacros.fat)}
+                <span className="text-xs text-gray-400 font-medium ml-0.5">/{macroGoals.fat}г</span>
+             </div>
            </div>
            <div className="flex flex-col items-center">
              <div className="w-2 h-2 rounded-full bg-blue-400 mb-1"></div>
              <div className="text-xs text-gray-400 uppercase font-bold">Углев.</div>
-             <div className="font-bold text-gray-800 text-lg">{Math.round(todayMacros.carbs)}г</div>
+             <div className="font-bold text-gray-800 text-lg leading-none mt-1">
+                {Math.round(todayMacros.carbs)}
+                <span className="text-xs text-gray-400 font-medium ml-0.5">/{macroGoals.carbs}г</span>
+             </div>
            </div>
         </div>
       </Card>
@@ -175,39 +271,169 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* Food History */}
       <div>
-        <h3 className="font-bold text-gray-800 mb-3 text-lg px-1">История питания</h3>
-        {foodEntries.length === 0 ? (
+        {/* Filter Header */}
+        <div className="flex justify-between items-end mb-4 px-1">
+            <h3 className="font-bold text-gray-800 text-lg">История питания</h3>
+            <div className="relative">
+                <select 
+                    value={filterType}
+                    onChange={(e) => setFilterType(e.target.value as any)}
+                    className="appearance-none bg-white border border-gray-200 text-gray-700 py-1.5 pl-3 pr-8 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
+                >
+                    <option value="today">Сегодня</option>
+                    <option value="week">7 дней</option>
+                    <option value="custom">Период</option>
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                </div>
+            </div>
+        </div>
+
+        {filterType === 'custom' && (
+            <div className="flex gap-2 mb-4 animate-in slide-in-from-top-2 fade-in">
+                <Input 
+                    type="date" 
+                    value={dateRange.start}
+                    onChange={(e) => setDateRange({...dateRange, start: e.target.value})}
+                    className="text-xs py-2 h-auto"
+                />
+                <Input 
+                    type="date" 
+                    value={dateRange.end}
+                    onChange={(e) => setDateRange({...dateRange, end: e.target.value})}
+                    className="text-xs py-2 h-auto"
+                />
+            </div>
+        )}
+
+        {filteredFoodEntries.length === 0 ? (
           <div className="text-center py-8 bg-white rounded-2xl border border-dashed border-gray-300">
              <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-2 text-gray-400">
                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
              </div>
-             <p className="text-gray-500 text-sm">Пока пусто. Добавьте первый прием пищи!</p>
-             <button onClick={openCamera} className="mt-2 text-primary font-bold text-sm">Добавить +</button>
+             <p className="text-gray-500 text-sm">Нет записей за выбранный период.</p>
+             {filterType === 'today' && (
+                 <button onClick={openCamera} className="mt-2 text-primary font-bold text-sm">Добавить +</button>
+             )}
           </div>
         ) : (
           <div className="space-y-3">
-            {foodEntries.slice().reverse().map(entry => (
-              <div key={entry.id} onClick={() => onEditFood(entry)} className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 flex gap-3 items-center active:scale-95 transition-transform">
-                 {entry.imageUri ? (
-                   <img src={entry.imageUri} alt={entry.name} className="w-16 h-16 rounded-xl object-cover bg-gray-100" />
-                 ) : (
-                   <div className="w-16 h-16 rounded-xl bg-gray-100 flex items-center justify-center text-gray-400">
-                      <span className="text-xs">Нет фото</span>
+            {filteredFoodEntries.map(entry => {
+              const isExpanded = expandedFoodId === entry.id;
+
+              // Data for the mini bar chart in expanded view
+              const chartData = [
+                { name: 'Белки', amount: entry.macros.protein, percent: (entry.macros.protein / macroGoals.protein) * 100, fill: '#34D399' },
+                { name: 'Жиры', amount: entry.macros.fat, percent: (entry.macros.fat / macroGoals.fat) * 100, fill: '#FBBF24' },
+                { name: 'Углев', amount: entry.macros.carbs, percent: (entry.macros.carbs / macroGoals.carbs) * 100, fill: '#60A5FA' },
+              ];
+
+              return (
+                <div key={entry.id} className={`bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden transition-all duration-300 ${isExpanded ? 'ring-2 ring-primary/5 shadow-md' : ''}`}>
+                   {/* Header */}
+                   <div 
+                     onClick={() => setExpandedFoodId(isExpanded ? null : entry.id)}
+                     className="p-3 flex gap-3 items-center cursor-pointer hover:bg-gray-50 active:bg-gray-100 transition-colors"
+                   >
+                       {/* Image */}
+                       {entry.imageUri ? (
+                         <img src={entry.imageUri} alt={entry.name} className="w-14 h-14 rounded-xl object-cover bg-gray-100 shrink-0" />
+                       ) : (
+                         <div className="w-14 h-14 rounded-xl bg-gray-100 flex items-center justify-center text-gray-400 shrink-0">
+                            <span className="text-[10px]">Нет фото</span>
+                         </div>
+                       )}
+                       
+                       <div className="flex-1 min-w-0">
+                         <div className="flex justify-between items-start">
+                             <h4 className="font-bold text-gray-800 truncate text-sm">{entry.name}</h4>
+                             <span className="font-bold text-xs text-gray-900 bg-gray-100 px-2 py-0.5 rounded-full ml-2 whitespace-nowrap">
+                                {Math.round(entry.macros.calories)} ккал
+                             </span>
+                         </div>
+                         <div className="text-xs text-gray-500 flex justify-between items-center mt-1">
+                            <div className="flex items-center gap-2">
+                                <span className={`${entry.rating >= 7 ? 'text-emerald-500' : 'text-amber-500'} font-medium`}>{entry.rating}/10</span>
+                                <span className="text-gray-300">•</span>
+                                <span>{new Date(entry.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                                {filterType !== 'today' && (
+                                    <>
+                                        <span className="text-gray-300">•</span>
+                                        <span>{new Date(entry.timestamp).toLocaleDateString()}</span>
+                                    </>
+                                )}
+                            </div>
+                            <svg className={`w-4 h-4 text-gray-300 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                         </div>
+                       </div>
                    </div>
-                 )}
-                 <div className="flex-1 min-w-0">
-                   <h4 className="font-bold text-gray-800 truncate">{entry.name}</h4>
-                   <div className="text-xs text-gray-500 flex gap-2 items-center mt-1">
-                      <span className="font-medium text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded">{Math.round(entry.macros.calories)} ккал</span>
-                      <span className="text-gray-300">•</span>
-                      <span className={`${entry.rating >= 7 ? 'text-emerald-500' : 'text-amber-500'} font-medium`}>{entry.rating}/10</span>
-                   </div>
-                 </div>
-                 <button className="p-2 text-gray-300 hover:text-primary transition-colors">
-                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                 </button>
-              </div>
-            ))}
+
+                   {/* Body */}
+                   {isExpanded && (
+                      <div className="px-4 pb-4 pt-0 animate-in slide-in-from-top-2 fade-in duration-200">
+                          {/* Macros */}
+                          <div className="grid grid-cols-3 gap-2 my-3">
+                              <div className="bg-emerald-50 p-2 rounded-xl text-center">
+                                  <div className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">Белки</div>
+                                  <div className="font-bold text-gray-700">{Math.round(entry.macros.protein)}г</div>
+                              </div>
+                              <div className="bg-amber-50 p-2 rounded-xl text-center">
+                                  <div className="text-[10px] text-amber-600 font-bold uppercase tracking-wider">Жиры</div>
+                                  <div className="font-bold text-gray-700">{Math.round(entry.macros.fat)}г</div>
+                              </div>
+                              <div className="bg-blue-50 p-2 rounded-xl text-center">
+                                  <div className="text-[10px] text-blue-600 font-bold uppercase tracking-wider">Углев.</div>
+                                  <div className="font-bold text-gray-700">{Math.round(entry.macros.carbs)}г</div>
+                              </div>
+                          </div>
+
+                          {/* Contribution Chart */}
+                          <div className="mb-3">
+                             <h5 className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2 text-center">Вклад в дневную цель (%)</h5>
+                             <div className="h-24 w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={chartData} layout="vertical" margin={{ top: 0, right: 20, left: 10, bottom: 0 }}>
+                                        <XAxis type="number" hide />
+                                        <YAxis dataKey="name" type="category" width={40} tick={{fontSize: 10, fill: '#6B7280'}} interval={0} axisLine={false} tickLine={false} />
+                                        <Tooltip cursor={{fill: 'transparent'}} content={<CustomTooltip />} />
+                                        <Bar dataKey="percent" radius={[0, 4, 4, 0]} barSize={16} background={{ fill: '#F3F4F6' }}>
+                                            {chartData.map((d, index) => (
+                                                <Cell key={`cell-${index}`} fill={d.fill} />
+                                            ))}
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
+                             </div>
+                          </div>
+                          
+                          {/* Recommendation */}
+                          {entry.recommendation && (
+                              <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 mb-3">
+                                  <p className="text-xs text-gray-600 leading-relaxed italic">
+                                     "{entry.recommendation}"
+                                  </p>
+                              </div>
+                          )}
+
+                          {/* Edit Button */}
+                          <button 
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onEditFood(entry);
+                            }}
+                            className="w-full py-2 bg-white border border-gray-200 text-gray-600 rounded-xl text-xs font-bold hover:bg-gray-50 hover:text-primary hover:border-primary/30 transition-all flex items-center justify-center gap-2"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                            Редактировать запись
+                          </button>
+                      </div>
+                   )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

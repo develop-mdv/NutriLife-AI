@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { Dashboard } from './components/Dashboard';
 import { FoodLogger } from './components/FoodLogger';
 import { ChatBot } from './components/ChatBot';
 import { Profile } from './components/Profile';
 import { ActivityLogger } from './components/ActivityLogger';
-import { AppView, FoodEntry, UserProfile, Macros, ActivityEntry, RoadmapStep } from './types';
+import { AppView, FoodEntry, UserProfile, Macros, ActivityEntry, RoadmapStep, MealRemindersConfig, ReminderConfig } from './types';
 import { Button, Input } from './components/UI';
 
 // Mock Data
@@ -17,7 +18,16 @@ const INITIAL_PROFILE: UserProfile = {
   goal: 'lose_weight',
   activityLevel: 'active',
   dailyCalorieGoal: 2200,
-  dailyStepGoal: 10000
+  dailyStepGoal: 10000,
+  allergies: '',
+  preferences: '',
+  healthConditions: ''
+};
+
+const INITIAL_MEAL_REMINDERS: MealRemindersConfig = {
+  breakfast: { enabled: false, time: '09:00' },
+  lunch: { enabled: false, time: '13:00' },
+  dinner: { enabled: false, time: '19:00' }
 };
 
 const App: React.FC = () => {
@@ -37,6 +47,10 @@ const App: React.FC = () => {
   const [waterIntake, setWaterIntake] = useState(0);
   const WATER_GOAL = 2500;
   const [remindersEnabled, setRemindersEnabled] = useState(false);
+
+  // Meal Reminders
+  const [mealReminders, setMealReminders] = useState<MealRemindersConfig>(INITIAL_MEAL_REMINDERS);
+  const lastNotifiedMinute = useRef<string | null>(null);
 
   useEffect(() => {
     let interval: any;
@@ -64,6 +78,40 @@ const App: React.FC = () => {
 
     return () => clearInterval(interval);
   }, [remindersEnabled]);
+
+  // Meal Reminders Check Loop
+  useEffect(() => {
+    const checkMealReminders = () => {
+      if (Notification.permission !== 'granted') return;
+
+      const now = new Date();
+      const currentMinuteStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+
+      // Prevent multiple notifications in the same minute
+      if (lastNotifiedMinute.current === currentMinuteStr) return;
+
+      const labels: Record<string, string> = {
+        breakfast: 'Завтрак',
+        lunch: 'Обед',
+        dinner: 'Ужин'
+      };
+
+      Object.entries(mealReminders).forEach(([key, value]) => {
+        const config = value as ReminderConfig;
+        if (config.enabled && config.time === currentMinuteStr) {
+          new Notification(`Время приема пищи: ${labels[key]} 🍽️`, {
+            body: `Пора подкрепиться! Не забудьте записать еду в приложение.`,
+            icon: "https://cdn-icons-png.flaticon.com/512/1046/1046784.png"
+          });
+          lastNotifiedMinute.current = currentMinuteStr;
+        }
+      });
+    };
+
+    // Check every 10 seconds to catch the minute change accurately
+    const interval = setInterval(checkMealReminders, 10000);
+    return () => clearInterval(interval);
+  }, [mealReminders]);
 
   const toggleReminders = () => {
     if (!remindersEnabled) {
@@ -183,6 +231,8 @@ const App: React.FC = () => {
             onUpdateProfile={setProfile} 
             roadmap={roadmap}
             onUpdateRoadmap={setRoadmap}
+            mealReminders={mealReminders}
+            onUpdateMealReminders={setMealReminders}
           />
         );
       default:

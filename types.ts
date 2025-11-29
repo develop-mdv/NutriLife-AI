@@ -1,3 +1,4 @@
+
 export interface Macros {
   calories: number;
   protein: number;
@@ -33,6 +34,9 @@ export interface UserProfile {
   activityLevel: 'sedentary' | 'active' | 'athletic';
   dailyCalorieGoal: number;
   dailyStepGoal: number;
+  allergies?: string;
+  preferences?: string;
+  healthConditions?: string;
 }
 
 export interface RoadmapStep {
@@ -47,6 +51,17 @@ export interface Achievement {
   description: string;
   icon: string;
   unlocked: boolean;
+}
+
+export interface ReminderConfig {
+  enabled: boolean;
+  time: string; // "HH:MM"
+}
+
+export interface MealRemindersConfig {
+  breakfast: ReminderConfig;
+  lunch: ReminderConfig;
+  dinner: ReminderConfig;
 }
 
 export enum AppView {

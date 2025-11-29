@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
-import { UserProfile, RoadmapStep, Achievement } from '../types';
-import { Card, Button, LoadingSpinner } from './UI';
+import { UserProfile, RoadmapStep, Achievement, MealRemindersConfig } from '../types';
+import { Card, Button, LoadingSpinner, Input } from './UI';
 import { generateWellnessRoadmap } from '../services/geminiService';
 
 interface ProfileProps {
@@ -8,10 +9,19 @@ interface ProfileProps {
   onUpdateProfile: (profile: UserProfile) => void;
   roadmap: RoadmapStep[];
   onUpdateRoadmap: (steps: RoadmapStep[]) => void;
+  mealReminders: MealRemindersConfig;
+  onUpdateMealReminders: (config: MealRemindersConfig) => void;
 }
 
-export const Profile: React.FC<ProfileProps> = ({ profile, onUpdateProfile, roadmap, onUpdateRoadmap }) => {
-  const [activeTab, setActiveTab] = useState<'stats' | 'roadmap'>('stats');
+export const Profile: React.FC<ProfileProps> = ({ 
+  profile, 
+  onUpdateProfile, 
+  roadmap, 
+  onUpdateRoadmap,
+  mealReminders,
+  onUpdateMealReminders
+}) => {
+  const [activeTab, setActiveTab] = useState<'stats' | 'roadmap' | 'settings'>('stats');
   const [loadingRoadmap, setLoadingRoadmap] = useState(false);
   const [isEditingGoal, setIsEditingGoal] = useState(false);
   
@@ -40,6 +50,31 @@ export const Profile: React.FC<ProfileProps> = ({ profile, onUpdateProfile, road
     onUpdateRoadmap(steps);
     setLoadingRoadmap(false);
     setWishes(''); 
+  };
+
+  const handleToggleReminder = (meal: keyof MealRemindersConfig) => {
+    // Request permission if enabling
+    if (!mealReminders[meal].enabled && Notification.permission !== 'granted') {
+      Notification.requestPermission();
+    }
+    
+    onUpdateMealReminders({
+      ...mealReminders,
+      [meal]: {
+        ...mealReminders[meal],
+        enabled: !mealReminders[meal].enabled
+      }
+    });
+  };
+
+  const handleTimeChange = (meal: keyof MealRemindersConfig, time: string) => {
+    onUpdateMealReminders({
+      ...mealReminders,
+      [meal]: {
+        ...mealReminders[meal],
+        time
+      }
+    });
   };
 
   const achievements: Achievement[] = [
@@ -137,6 +172,12 @@ export const Profile: React.FC<ProfileProps> = ({ profile, onUpdateProfile, road
           className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === 'roadmap' ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}
         >
           Мой план
+        </button>
+        <button 
+          onClick={() => setActiveTab('settings')}
+          className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === 'settings' ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}
+        >
+          Настройки
         </button>
       </div>
 
@@ -239,6 +280,199 @@ export const Profile: React.FC<ProfileProps> = ({ profile, onUpdateProfile, road
             </>
           )}
         </div>
+      )}
+
+      {/* SETTINGS TAB (Meal Reminders + Profile Edit) */}
+      {activeTab === 'settings' && (
+         <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
+             
+             {/* Physical Stats */}
+             <Card>
+                <div className="flex items-start gap-4 mb-4">
+                    <div className="bg-blue-100 p-3 rounded-full text-blue-600">
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                    </div>
+                    <div>
+                        <h3 className="text-lg font-bold text-gray-800">Физические данные</h3>
+                        <p className="text-sm text-gray-500">Обновите ваши параметры для точных расчетов.</p>
+                    </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="text-xs text-gray-500 uppercase font-bold">Рост (см)</label>
+                        <Input 
+                            type="number" 
+                            value={profile.height} 
+                            onChange={(e) => onUpdateProfile({...profile, height: Number(e.target.value)})}
+                        />
+                    </div>
+                    <div>
+                        <label className="text-xs text-gray-500 uppercase font-bold">Вес (кг)</label>
+                        <Input 
+                            type="number" 
+                            value={profile.weight} 
+                            onChange={(e) => onUpdateProfile({...profile, weight: Number(e.target.value)})}
+                        />
+                    </div>
+                    <div>
+                        <label className="text-xs text-gray-500 uppercase font-bold">Возраст</label>
+                        <Input 
+                            type="number" 
+                            value={profile.age} 
+                            onChange={(e) => onUpdateProfile({...profile, age: Number(e.target.value)})}
+                        />
+                    </div>
+                     <div>
+                        <label className="text-xs text-gray-500 uppercase font-bold">Имя</label>
+                        <Input 
+                            type="text" 
+                            value={profile.name} 
+                            onChange={(e) => onUpdateProfile({...profile, name: e.target.value})}
+                        />
+                    </div>
+                </div>
+             </Card>
+
+             {/* Personalization (Allergies, etc) */}
+             <Card>
+                <div className="flex items-start gap-4 mb-4">
+                    <div className="bg-emerald-100 p-3 rounded-full text-emerald-600">
+                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    </div>
+                    <div>
+                        <h3 className="text-lg font-bold text-gray-800">Персонализация</h3>
+                        <p className="text-sm text-gray-500">Укажите ограничения для ИИ тренера.</p>
+                    </div>
+                </div>
+
+                <div className="space-y-4">
+                    <div>
+                        <label className="text-xs text-gray-500 uppercase font-bold">Аллергии</label>
+                        <textarea 
+                            className="w-full bg-gray-50 border border-gray-200 text-gray-800 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all text-sm mt-1"
+                            rows={2}
+                            placeholder="Например: орехи, лактоза..."
+                            value={profile.allergies || ''}
+                            onChange={(e) => onUpdateProfile({...profile, allergies: e.target.value})}
+                        />
+                    </div>
+                    <div>
+                        <label className="text-xs text-gray-500 uppercase font-bold">Предпочтения в еде</label>
+                        <textarea 
+                            className="w-full bg-gray-50 border border-gray-200 text-gray-800 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all text-sm mt-1"
+                            rows={2}
+                            placeholder="Например: люблю острое, вегетарианец..."
+                            value={profile.preferences || ''}
+                            onChange={(e) => onUpdateProfile({...profile, preferences: e.target.value})}
+                        />
+                    </div>
+                    <div>
+                        <label className="text-xs text-gray-500 uppercase font-bold">Ограничения по здоровью</label>
+                        <textarea 
+                            className="w-full bg-gray-50 border border-gray-200 text-gray-800 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all text-sm mt-1"
+                            rows={2}
+                            placeholder="Например: диабет, больные колени..."
+                            value={profile.healthConditions || ''}
+                            onChange={(e) => onUpdateProfile({...profile, healthConditions: e.target.value})}
+                        />
+                    </div>
+                </div>
+             </Card>
+
+             <Card>
+                <div className="flex items-start gap-4 mb-4">
+                    <div className="bg-purple-100 p-3 rounded-full text-purple-600">
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    </div>
+                    <div>
+                        <h3 className="text-lg font-bold text-gray-800">Напоминания о еде</h3>
+                        <p className="text-sm text-gray-500">Приложение напомнит вам записать прием пищи в указанное время.</p>
+                    </div>
+                </div>
+
+                <div className="space-y-4">
+                    {/* Breakfast */}
+                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+                        <div className="flex items-center gap-3">
+                             <span className="text-xl">🍳</span>
+                             <div>
+                                 <p className="font-bold text-gray-700 text-sm">Завтрак</p>
+                                 <input 
+                                    type="time" 
+                                    value={mealReminders.breakfast.time}
+                                    onChange={(e) => handleTimeChange('breakfast', e.target.value)}
+                                    className="bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 mt-1 block"
+                                 />
+                             </div>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            className="sr-only peer"
+                            checked={mealReminders.breakfast.enabled}
+                            onChange={() => handleToggleReminder('breakfast')}
+                          />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                        </label>
+                    </div>
+
+                    {/* Lunch */}
+                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+                        <div className="flex items-center gap-3">
+                             <span className="text-xl">🥗</span>
+                             <div>
+                                 <p className="font-bold text-gray-700 text-sm">Обед</p>
+                                 <input 
+                                    type="time" 
+                                    value={mealReminders.lunch.time}
+                                    onChange={(e) => handleTimeChange('lunch', e.target.value)}
+                                    className="bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 mt-1 block"
+                                 />
+                             </div>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            className="sr-only peer"
+                            checked={mealReminders.lunch.enabled}
+                            onChange={() => handleToggleReminder('lunch')}
+                          />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                        </label>
+                    </div>
+
+                    {/* Dinner */}
+                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+                        <div className="flex items-center gap-3">
+                             <span className="text-xl">🍲</span>
+                             <div>
+                                 <p className="font-bold text-gray-700 text-sm">Ужин</p>
+                                 <input 
+                                    type="time" 
+                                    value={mealReminders.dinner.time}
+                                    onChange={(e) => handleTimeChange('dinner', e.target.value)}
+                                    className="bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 mt-1 block"
+                                 />
+                             </div>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            className="sr-only peer"
+                            checked={mealReminders.dinner.enabled}
+                            onChange={() => handleToggleReminder('dinner')}
+                          />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                        </label>
+                    </div>
+                </div>
+             </Card>
+             
+             <div className="text-center text-xs text-gray-400 px-4">
+                 * Чтобы получать уведомления, приложение должно быть открыто в браузере. Разрешите уведомления в настройках вашего устройства.
+             </div>
+         </div>
       )}
 
       {/* Adjustment Modal Overlay */}

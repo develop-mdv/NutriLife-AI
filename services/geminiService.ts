@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type, Schema, LiveServerMessage, Modality } from "@google/genai";
 import { Macros, RoadmapStep } from "../types";
 
@@ -134,8 +135,13 @@ export const sendChatMessage = async (
 export const generateWellnessRoadmap = async (userProfile: any, wishes?: string): Promise<RoadmapStep[]> => {
   try {
     const prompt = `Создай план оздоровления из 5 конкретных шагов для пользователя.
-    Данные профиля: ${JSON.stringify(userProfile)}.
-    Основная цель: ${userProfile.goal}.
+    Данные профиля:
+    - Цель: ${userProfile.goal}
+    - Возраст: ${userProfile.age}, Вес: ${userProfile.weight}, Рост: ${userProfile.height}
+    ${userProfile.allergies ? `- Аллергии: ${userProfile.allergies}` : ""}
+    ${userProfile.preferences ? `- Предпочтения в еде: ${userProfile.preferences}` : ""}
+    ${userProfile.healthConditions ? `- Ограничения здоровья: ${userProfile.healthConditions}` : ""}
+    
     ${wishes ? `ОСОБЫЕ ПОЖЕЛАНИЯ ПОЛЬЗОВАТЕЛЯ (УЧТИ ОБЯЗАТЕЛЬНО): ${wishes}` : ""}
     
     Верни JSON массив. Каждый шаг должен содержать 'title' (краткий заголовок), 'description' (конкретное действие) и 'status' (всегда "pending").

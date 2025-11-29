@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Button, Card, Input, LoadingSpinner } from './UI';
 import { sendChatMessage, LiveClient } from '../services/geminiService';
@@ -72,7 +73,11 @@ export const ChatBot: React.FC<ChatBotProps> = ({
   const getUserContext = () => {
     if (!userProfile) return "";
     let context = `Данные пользователя:\n`;
-    context += `Имя: ${userProfile.name}, Возраст: ${userProfile.age}, Цель: ${userProfile.goal === 'lose_weight' ? 'Похудение' : userProfile.goal === 'gain_muscle' ? 'Набор массы' : 'Поддержание'}.\n`;
+    context += `Имя: ${userProfile.name}, Возраст: ${userProfile.age}, Рост: ${userProfile.height}, Вес: ${userProfile.weight}, Цель: ${userProfile.goal === 'lose_weight' ? 'Похудение' : userProfile.goal === 'gain_muscle' ? 'Набор массы' : 'Поддержание'}.\n`;
+    
+    if (userProfile.allergies) context += `Аллергии: ${userProfile.allergies}\n`;
+    if (userProfile.preferences) context += `Предпочтения: ${userProfile.preferences}\n`;
+    if (userProfile.healthConditions) context += `Здоровье: ${userProfile.healthConditions}\n`;
     
     if (todayMacros) {
       context += `Питание сегодня (КБЖУ): ${Math.round(todayMacros.calories)} ккал (Б:${Math.round(todayMacros.protein)}, Ж:${Math.round(todayMacros.fat)}, У:${Math.round(todayMacros.carbs)}).\n`;
