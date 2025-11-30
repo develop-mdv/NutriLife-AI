@@ -5,7 +5,9 @@ import { FoodLogger } from './components/FoodLogger';
 import { ChatBot } from './components/ChatBot';
 import { Profile } from './components/Profile';
 import { ActivityLogger } from './components/ActivityLogger';
-import { AppView, FoodEntry, UserProfile, Macros, ActivityEntry, RoadmapStep, MealRemindersConfig, ReminderConfig } from './types';
+import { Walks } from './components/Walks';
+import { SleepTracker } from './components/SleepTracker';
+import { AppView, FoodEntry, UserProfile, Macros, ActivityEntry, RoadmapStep, MealRemindersConfig, ReminderConfig, SleepConfig, SleepEntry } from './types';
 import { Button, Input } from './components/UI';
 
 // Mock Data
@@ -30,6 +32,14 @@ const INITIAL_MEAL_REMINDERS: MealRemindersConfig = {
   dinner: { enabled: false, time: '19:00' }
 };
 
+const INITIAL_SLEEP_CONFIG: SleepConfig = {
+    targetHours: 8,
+    bedTime: '23:00',
+    wakeTime: '07:00',
+    bedTimeReminderEnabled: false,
+    wakeAlarmEnabled: false
+};
+
 const App: React.FC = () => {
   const [view, setView] = useState<AppView>(AppView.DASHBOARD);
   const [profile, setProfile] = useState<UserProfile>(INITIAL_PROFILE);
@@ -39,6 +49,10 @@ const App: React.FC = () => {
   const [steps, setSteps] = useState(4520); // Initial steps
   const [editingFood, setEditingFood] = useState<FoodEntry | null>(null);
   
+  // Sleep State
+  const [sleepEntries, setSleepEntries] = useState<SleepEntry[]>([]);
+  const [sleepConfig, setSleepConfig] = useState<SleepConfig>(INITIAL_SLEEP_CONFIG);
+
   // Step Sync State
   const [isStepModalOpen, setIsStepModalOpen] = useState(false);
   const [stepInput, setStepInput] = useState('');
@@ -51,6 +65,7 @@ const App: React.FC = () => {
   // Meal Reminders
   const [mealReminders, setMealReminders] = useState<MealRemindersConfig>(INITIAL_MEAL_REMINDERS);
   const lastNotifiedMinute = useRef<string | null>(null);
+  const lastSleepNotifiedMinute = useRef<string | null>(null);
 
   useEffect(() => {
     let interval: any;
@@ -79,39 +94,69 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [remindersEnabled]);
 
-  // Meal Reminders Check Loop
+  // Combined Reminders Check Loop (Meals + Sleep)
   useEffect(() => {
-    const checkMealReminders = () => {
+    const checkReminders = () => {
       if (Notification.permission !== 'granted') return;
 
       const now = new Date();
       const currentMinuteStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 
+      // --- MEAL REMINDERS ---
       // Prevent multiple notifications in the same minute
-      if (lastNotifiedMinute.current === currentMinuteStr) return;
+      if (lastNotifiedMinute.current !== currentMinuteStr) {
+          const labels: Record<string, string> = {
+            breakfast: 'Завтрак',
+            lunch: 'Обед',
+            dinner: 'Ужин'
+          };
 
-      const labels: Record<string, string> = {
-        breakfast: 'Завтрак',
-        lunch: 'Обед',
-        dinner: 'Ужин'
-      };
-
-      Object.entries(mealReminders).forEach(([key, value]) => {
-        const config = value as ReminderConfig;
-        if (config.enabled && config.time === currentMinuteStr) {
-          new Notification(`Время приема пищи: ${labels[key]} 🍽️`, {
-            body: `Пора подкрепиться! Не забудьте записать еду в приложение.`,
-            icon: "https://cdn-icons-png.flaticon.com/512/1046/1046784.png"
+          Object.entries(mealReminders).forEach(([key, value]) => {
+            const config = value as ReminderConfig;
+            if (config.enabled && config.time === currentMinuteStr) {
+              new Notification(`Время приема пищи: ${labels[key]} 🍽️`, {
+                body: `Пора подкрепиться! Не забудьте записать еду в приложение.`,
+                icon: "https://cdn-icons-png.flaticon.com/512/1046/1046784.png"
+              });
+              lastNotifiedMinute.current = currentMinuteStr;
+            }
           });
-          lastNotifiedMinute.current = currentMinuteStr;
-        }
-      });
+      }
+
+      // --- SLEEP REMINDERS & ALARM ---
+      if (lastSleepNotifiedMinute.current !== currentMinuteStr) {
+          // Bedtime Reminder
+          if (sleepConfig.bedTimeReminderEnabled && sleepConfig.bedTime === currentMinuteStr) {
+               new Notification("Пора готовиться ко сну 🌙", {
+                   body: "Отложите телефон, чтобы выспаться и восстановиться.",
+                   icon: "https://cdn-icons-png.flaticon.com/512/2927/2927347.png"
+               });
+               lastSleepNotifiedMinute.current = currentMinuteStr;
+          }
+
+          // Wake Up Alarm
+          if (sleepConfig.wakeAlarmEnabled && sleepConfig.wakeTime === currentMinuteStr) {
+               new Notification("Доброе утро! ☀️", {
+                   body: "Пора вставать и покорять новые вершины!",
+                   requireInteraction: true, // Keep it visible until clicked
+                   icon: "https://cdn-icons-png.flaticon.com/512/869/869142.png"
+               });
+               
+               // Play a sound if possible (requires interaction usually, but works in some contexts)
+               try {
+                   const audio = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
+                   audio.play().catch(e => console.log("Autoplay prevented", e));
+               } catch (e) { console.error(e) }
+
+               lastSleepNotifiedMinute.current = currentMinuteStr;
+          }
+      }
     };
 
     // Check every 10 seconds to catch the minute change accurately
-    const interval = setInterval(checkMealReminders, 10000);
+    const interval = setInterval(checkReminders, 10000);
     return () => clearInterval(interval);
-  }, [mealReminders]);
+  }, [mealReminders, sleepConfig]);
 
   const toggleReminders = () => {
     if (!remindersEnabled) {
@@ -136,6 +181,9 @@ const App: React.FC = () => {
   }), { calories: 0, protein: 0, fat: 0, carbs: 0 });
 
   const burnedCalories = activityEntries.reduce((acc, entry) => acc + entry.caloriesBurned, 0);
+  
+  // Get latest sleep entry
+  const lastSleepEntry = sleepEntries.length > 0 ? sleepEntries[sleepEntries.length - 1] : undefined;
 
   const handleSaveFood = (entry: FoodEntry) => {
     if (editingFood) {
@@ -161,6 +209,10 @@ const App: React.FC = () => {
     setActivityEntries([...activityEntries, entry]);
     setView(AppView.DASHBOARD);
   };
+  
+  const handleSaveSleep = (entry: SleepEntry) => {
+      setSleepEntries(prev => [...prev, entry]);
+  }
 
   // Open Step Sync Modal
   const openSyncSteps = () => {
@@ -190,8 +242,11 @@ const App: React.FC = () => {
             waterIntake={waterIntake}
             waterGoal={WATER_GOAL}
             remindersEnabled={remindersEnabled}
+            sleepConfig={sleepConfig}
+            lastSleepEntry={lastSleepEntry}
             openCamera={() => { setEditingFood(null); setView(AppView.FOOD_LOG); }}
             openActivity={() => setView(AppView.ACTIVITY)}
+            openSleepTracker={() => setView(AppView.SLEEP)}
             syncSteps={openSyncSteps}
             onEditFood={handleEditFood}
             onAddWater={(amount) => setWaterIntake(prev => prev + amount)}
@@ -222,6 +277,9 @@ const App: React.FC = () => {
             foodHistory={foodEntries}
             waterIntake={waterIntake}
             activityCalories={burnedCalories}
+            sleepData={lastSleepEntry}
+            sleepConfig={sleepConfig}
+            onSetAlarm={(time) => setSleepConfig({...sleepConfig, wakeTime: time, wakeAlarmEnabled: true})}
           />
         );
       case AppView.PROFILE:
@@ -233,7 +291,30 @@ const App: React.FC = () => {
             onUpdateRoadmap={setRoadmap}
             mealReminders={mealReminders}
             onUpdateMealReminders={setMealReminders}
+            stats={{
+              calories: Math.round(todayMacros.calories),
+              steps: steps,
+              water: waterIntake,
+              waterGoal: WATER_GOAL
+            }}
           />
+        );
+      case AppView.WALKS:
+        return (
+          <Walks 
+            currentSteps={steps}
+            dailyGoal={profile.dailyStepGoal}
+          />
+        );
+      case AppView.SLEEP:
+        return (
+           <SleepTracker 
+              onSaveEntry={handleSaveSleep}
+              config={sleepConfig}
+              onUpdateConfig={setSleepConfig}
+              onClose={() => setView(AppView.DASHBOARD)}
+              entries={sleepEntries}
+           />
         );
       default:
         return null;
@@ -256,7 +337,7 @@ const App: React.FC = () => {
       </main>
 
       {/* Bottom Tab Bar (Only show if not in specific sub-views like camera or activity input) */}
-      {view !== AppView.FOOD_LOG && view !== AppView.ACTIVITY && (
+      {view !== AppView.FOOD_LOG && view !== AppView.ACTIVITY && view !== AppView.SLEEP && (
         <div className="absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-100 px-4 py-2 flex justify-between items-end pb-8 z-50 rounded-t-3xl">
            <NavItem 
              active={view === AppView.DASHBOARD} 
@@ -272,10 +353,10 @@ const App: React.FC = () => {
            />
            <div className="w-12"></div> {/* Spacing for floating button */}
            <NavItem 
-             active={false}
-             onClick={openSyncSteps}
-             label="Синхр."
-             icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>}
+             active={view === AppView.WALKS}
+             onClick={() => setView(AppView.WALKS)}
+             label="Прогулки"
+             icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>}
            />
            <NavItem 
              active={view === AppView.PROFILE}

@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type, Schema, LiveServerMessage, Modality } from "@google/genai";
-import { Macros, RoadmapStep } from "../types";
+import { Macros, RoadmapStep, WalkingRoute } from "../types";
 
 const apiKey = process.env.API_KEY || "";
 const ai = new GoogleGenAI({ apiKey });
@@ -84,7 +84,7 @@ export const sendChatMessage = async (
   try {
     // Keywords to trigger tools
     const searchKeywords = ['новости', 'поиск', 'найди', 'инфо', 'рецепт', 'исследование', 'цена', 'сколько', 'кто', 'когда', 'погода', 'состав'];
-    const mapKeywords = ['где', 'карта', 'рядом', 'найти', 'адрес', 'маршрут', 'магазин', 'зал', 'аптека', 'больница', 'парк', 'ресторан', 'кафе'];
+    const mapKeywords = ['где', 'карта', 'рядом', 'найти', 'адрес', 'маршрут', 'магазин', 'зал', 'аптека', 'больница', 'парк', 'ресторан', 'кафе', 'прогулка', 'маршрут'];
 
     const lowerMsg = (message || "").toLowerCase();
     const needsSearch = searchKeywords.some(k => lowerMsg.includes(k));
@@ -97,7 +97,7 @@ export const sendChatMessage = async (
     // Switch to gemini-2.5-flash if tools are needed for better grounding support and speed
     const model = (needsSearch || needsMaps) ? "gemini-2.5-flash" : "gemini-3-pro-preview";
 
-    const systemInstruction = "Ты полезный и мотивирующий тренер по питанию и фитнесу. Отвечай кратко и на русском языке. Если используешь поиск или карты, используй эту информацию для ответа." + (context ? `\n\nКонтекст пользователя и история:\n${context}` : "");
+    const systemInstruction = "Ты полезный и мотивирующий тренер по питанию, сну и фитнесу. Отвечай кратко и на русском языке. Если используешь поиск или карты, используй эту информацию для ответа. Если пользователь просит поставить будильник, подтверди, что ты обновил настройки (но само действие выполняется приложением)." + (context ? `\n\nКонтекст пользователя и история:\n${context}` : "");
 
     const chat = ai.chats.create({
       model: model,
@@ -142,6 +142,8 @@ export const generateWellnessRoadmap = async (userProfile: any, wishes?: string)
     ${userProfile.preferences ? `- Предпочтения в еде: ${userProfile.preferences}` : ""}
     ${userProfile.healthConditions ? `- Ограничения здоровья: ${userProfile.healthConditions}` : ""}
     
+    ВКЛЮЧИ в план хотя бы один пункт, касающийся РЕЖИМА СНА и восстановления, если это уместно для цели.
+    
     ${wishes ? `ОСОБЫЕ ПОЖЕЛАНИЯ ПОЛЬЗОВАТЕЛЯ (УЧТИ ОБЯЗАТЕЛЬНО): ${wishes}` : ""}
     
     Верни JSON массив. Каждый шаг должен содержать 'title' (краткий заголовок), 'description' (конкретное действие) и 'status' (всегда "pending").
@@ -175,6 +177,143 @@ export const generateWellnessRoadmap = async (userProfile: any, wishes?: string)
     return [];
   }
 }
+
+// --- Walking Routes Generation ---
+
+export const suggestWalkingRoutes = async (
+  lat: number | null, 
+  lng: number | null, 
+  stepsNeeded: number,
+  mode: 'nearby' | 'direct' | 'custom_address',
+  customAddress?: string
+): Promise<WalkingRoute[]> => {
+  try {
+    const distanceKm = (stepsNeeded * 0.7) / 1000; // Approx 0.7m per step
+    const targetKm = Math.max(1, distanceKm); // At least 1km
+    const halfTargetKm = targetKm / 2; // For round trips
+
+    let locationInstruction = "";
+    if (mode === 'custom_address' && customAddress) {
+      locationInstruction = `СТАРТОВАЯ ТОЧКА: Адрес "${customAddress}".`;
+    } else if (lat && lng) {
+      locationInstruction = `СТАРТОВАЯ ТОЧКА: Координаты ${lat}, ${lng}.`;
+    } else {
+      locationInstruction = "Местоположение неизвестно, используй центр Москвы.";
+    }
+
+    // Creating a more explicit prompt to force valid A-to-B routing
+    const prompt = `
+      Ты профессиональный гид-навигатор. Твоя задача - создать ровно 4 РАЗНЫХ пешеходных маршрута для пользователя.
+      
+      ${locationInstruction}
+      
+      ОБЩАЯ ЦЕЛЬ ДИСТАНЦИИ: Пройти ${targetKm.toFixed(1)} км (примерно ${stepsNeeded} шагов).
+      
+      ИНСТРУКЦИИ ПО РЕЖИМАМ (СТРОГО):
+      
+      Режим: ${mode}
+      
+      1. Если режим 'nearby' (Рядом):
+         - Найди 4 ближайших парка или сквера.
+         - Маршрут: От [Старт] до [Вход в парк] и прогулка внутри.
+         - "isRoundTrip": false
+      
+      2. Если режим 'direct' (От меня) или 'custom_address' (От адреса):
+         - Сгенерируй ПЕРВЫЕ 3 маршрута как КРУГОВЫЕ (Туда-Обратно).
+           Точка Б должна быть на расстоянии ~${halfTargetKm.toFixed(1)} км от старта.
+           Пользователь идет: Старт -> Точка Б -> Старт.
+           
+         - Сгенерируй 4-й маршрут как ПРЯМОЙ (В одну сторону).
+           Точка Б должна быть на расстоянии ~${targetKm.toFixed(1)} км от старта.
+           Пользователь идет: Старт -> Точка Б.
+      
+      ВАЖНОЕ ПРАВИЛО "ТОЧКИ Б":
+      - Если это жилой район, выбери в качестве Точки Б: школу, ТЦ, станцию метро, памятник или перекресток крупных улиц.
+      - "endLocation" НЕ ДОЛЖЕН совпадать со "startLocation". Это должна быть другая точка.
+      - "title" придумай красивый, например "Прогулка до парка..." или "Круг через площадь...".
+
+      Верни СТРОГО валидный JSON массив из 4 объектов.
+      ОТВЕТ ДОЛЖЕН БЫТЬ ТОЛЬКО JSON. БЕЗ MARKDOWN.
+
+      Формат:
+      [
+        {
+          "title": "Название маршрута",
+          "description": "Краткое описание (например: дойдите до X, поверните к Y...)",
+          "estimatedSteps": ${stepsNeeded},
+          "durationMinutes": ${Math.round(targetKm * 12)}, 
+          "distanceKm": ${targetKm.toFixed(1)},
+          "startLocation": "Адрес старта (как в запросе)",
+          "endLocation": "Адрес финиша/разворота",
+          "isRoundTrip": true/false
+        }
+      ]
+    `;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+      config: {
+        tools: [{ googleMaps: {} }],
+        toolConfig: (lat && lng) ? {
+            retrievalConfig: {
+                latLng: {
+                    latitude: lat,
+                    longitude: lng
+                }
+            }
+        } : undefined,
+      }
+    });
+
+    const text = response.text;
+    if (!text) return [];
+
+    let cleanText = text.trim();
+    
+    // Robust extraction of JSON array
+    const startIndex = cleanText.indexOf('[');
+    const endIndex = cleanText.lastIndexOf(']');
+    
+    if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+        cleanText = cleanText.substring(startIndex, endIndex + 1);
+    } else {
+        console.warn("AI did not return a valid JSON array bracket block", text);
+        return [];
+    }
+    
+    try {
+        let routes = JSON.parse(cleanText) as WalkingRoute[];
+        
+        // --- STRICT POST-PROCESSING ENFORCEMENT ---
+        if (mode === 'direct' || mode === 'custom_address') {
+            // Ensure we have 4 routes if possible, or work with what we have
+            routes = routes.map((r, index) => {
+                // Force first 3 to be round trip, 4th to be one way
+                const shouldBeRoundTrip = index < 3; 
+                
+                // If AI made endLocation same as start, try to fix title, but we rely on map link mainly
+                const fixedTitle = r.title === r.startLocation ? `Прогулка до ${r.endLocation}` : r.title;
+
+                return {
+                    ...r,
+                    title: fixedTitle,
+                    isRoundTrip: shouldBeRoundTrip
+                };
+            });
+        }
+        
+        return routes;
+    } catch (e) {
+        console.error("JSON Parse error", e, cleanText);
+        return [];
+    }
+    
+  } catch (error) {
+    console.error("Walking routes error:", error);
+    return [];
+  }
+};
 
 // --- Live API (Audio) ---
 

@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button, Card, Input, LoadingSpinner } from './UI';
 import { sendChatMessage, LiveClient } from '../services/geminiService';
-import { Macros, UserProfile, FoodEntry } from '../types';
+import { Macros, UserProfile, FoodEntry, SleepEntry, SleepConfig } from '../types';
 
 interface Message {
   id: string;
@@ -18,6 +18,9 @@ interface ChatBotProps {
   foodHistory?: FoodEntry[];
   waterIntake?: number;
   activityCalories?: number;
+  sleepData?: SleepEntry;
+  sleepConfig?: SleepConfig;
+  onSetAlarm?: (time: string) => void;
 }
 
 export const ChatBot: React.FC<ChatBotProps> = ({ 
@@ -25,11 +28,14 @@ export const ChatBot: React.FC<ChatBotProps> = ({
   todayMacros, 
   foodHistory,
   waterIntake,
-  activityCalories 
+  activityCalories,
+  sleepData,
+  sleepConfig,
+  onSetAlarm
 }) => {
   const [mode, setMode] = useState<'text' | 'live'>('text');
   const [messages, setMessages] = useState<Message[]>([
-    { id: '1', role: 'model', text: 'Привет! Я твой ИИ-тренер по здоровью. Я вижу твои данные и историю. Спрашивай меня о питании, тренировках, или найди места поблизости (спортзалы, магазины)!' }
+    { id: '1', role: 'model', text: 'Привет! Я твой ИИ-тренер по здоровью. Я вижу твои данные по питанию, сну и активности. Спрашивай меня или проси поставить будильник!' }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -96,16 +102,49 @@ export const ChatBot: React.FC<ChatBotProps> = ({
     if (activityCalories !== undefined) {
        context += `Сожжено активностью сегодня: ${activityCalories} ккал.\n`;
     }
+
+    if (sleepData) {
+       context += `Последний сон: ${sleepData.durationHours} часов, качество: ${sleepData.quality}/10.\n`;
+    }
+
+    if (sleepConfig) {
+       context += `Настройки сна: Цель ${sleepConfig.targetHours}ч, Отбой: ${sleepConfig.bedTime}, Будильник: ${sleepConfig.wakeTime} (${sleepConfig.wakeAlarmEnabled ? 'Вкл' : 'Выкл'}).\n`;
+    }
     return context;
   };
 
   const handleSend = async () => {
     if (!input.trim()) return;
     
-    const newMsg: Message = { id: Date.now().toString(), role: 'user', text: input };
-    setMessages(prev => [...prev, newMsg]);
+    const userMsg: Message = { id: Date.now().toString(), role: 'user', text: input };
+    setMessages(prev => [...prev, userMsg]);
     setInput('');
     setLoading(true);
+
+    // --- ALARM CHECK (Client Side Intent Detection) ---
+    // Simple regex for "alarm at HH:MM" in Russian
+    // Patterns: "будильник на 07:00", "разбуди в 8:30", "alarm 7:00"
+    const alarmRegex = /(?:будильник|разбуди|подъем).+?(\d{1,2})[:.](\d{2})/i;
+    const match = userMsg.text.match(alarmRegex);
+    
+    if (match && onSetAlarm) {
+        const h = match[1].padStart(2, '0');
+        const m = match[2].padStart(2, '0');
+        const timeStr = `${h}:${m}`;
+        
+        onSetAlarm(timeStr);
+        
+        // Simulating delay for realism
+        setTimeout(() => {
+            setMessages(prev => [...prev, {
+                id: (Date.now() + 1).toString(),
+                role: 'model',
+                text: `Готово! Я установил будильник на ${timeStr}. Не забудьте оставить вкладку открытой, чтобы я мог вас разбудить.`
+            }]);
+            setLoading(false);
+        }, 1000);
+        return; // Skip API call
+    }
 
     const history = messages.map(m => ({
       role: m.role,
@@ -114,7 +153,7 @@ export const ChatBot: React.FC<ChatBotProps> = ({
     
     // Pass user context separately
     const context = getUserContext();
-    const response = await sendChatMessage(history, input, location, context);
+    const response = await sendChatMessage(history, userMsg.text, location, context);
     
     setMessages(prev => [...prev, { 
         id: (Date.now() + 1).toString(), 
@@ -230,7 +269,7 @@ export const ChatBot: React.FC<ChatBotProps> = ({
               value={input} 
               onChange={(e) => setInput(e.target.value)} 
               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-              placeholder="Спроси о диете, или найди магазин..." 
+              placeholder="Спроси о сне, или 'будильник на 07:00'..." 
               className="flex-1"
             />
             <Button onClick={handleSend} className="px-3">

@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Card, ProgressBar, Input } from './UI';
-import { UserProfile, Macros, FoodEntry } from '../types';
+import { UserProfile, Macros, FoodEntry, SleepConfig, SleepEntry } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 
 interface DashboardProps {
@@ -13,8 +13,11 @@ interface DashboardProps {
   waterIntake: number;
   waterGoal: number;
   remindersEnabled: boolean;
+  sleepConfig?: SleepConfig;
+  lastSleepEntry?: SleepEntry;
   openCamera: () => void;
   openActivity: () => void;
+  openSleepTracker: () => void;
   syncSteps: () => void;
   onEditFood: (entry: FoodEntry) => void;
   onAddWater: (amount: number) => void;
@@ -30,8 +33,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
   waterIntake,
   waterGoal,
   remindersEnabled,
+  sleepConfig,
+  lastSleepEntry,
   openCamera, 
   openActivity, 
+  openSleepTracker,
   syncSteps,
   onEditFood,
   onAddWater,
@@ -116,9 +122,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div className="bg-white p-2 border border-gray-100 shadow-md rounded-lg text-xs">
-          <p className="font-bold mb-1" style={{color: data.fill}}>{data.name}</p>
-          <p>{Math.round(data.amount)}г ({Math.round(data.percent)}% от нормы)</p>
+        <div className="bg-white p-3 border border-gray-100 shadow-xl rounded-xl text-xs min-w-[120px] z-50">
+          <div className="flex items-center justify-between gap-3 mb-1">
+             <span className="font-bold text-sm" style={{color: data.fill}}>{data.name}</span>
+             <span className="font-bold text-gray-800 text-sm">{Math.round(data.amount)} г</span>
+          </div>
+          <div className="text-gray-400 text-[10px]">
+            {Math.round(data.percent)}% от дневной нормы
+          </div>
         </div>
       );
     }
@@ -211,63 +222,101 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </Card>
 
-      {/* Water Tracker */}
-      <Card className="bg-cyan-50 border-cyan-100 overflow-visible">
-        <div className="flex justify-between items-start mb-2">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-cyan-200 rounded-lg text-cyan-700">
-               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" /></svg>
+      {/* Grid for Tracking Cards */}
+      <div className="grid grid-cols-2 gap-4">
+          
+          {/* Water Tracker */}
+          <Card className="bg-cyan-50 border-cyan-100 overflow-visible col-span-2 sm:col-span-1">
+            <div className="flex justify-between items-start mb-2">
+            <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-cyan-200 rounded-lg text-cyan-700">
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" /></svg>
+                </div>
+                <div>
+                <h3 className="font-bold text-gray-800 text-sm">Вода</h3>
+                <p className="text-[10px] text-gray-500">{waterIntake} / {waterGoal} мл</p>
+                </div>
             </div>
-            <div>
-              <h3 className="font-bold text-gray-800">Водный баланс</h3>
-              <p className="text-xs text-gray-500">{waterIntake} / {waterGoal} мл</p>
+            <button 
+                onClick={onToggleReminders}
+                className={`p-1.5 rounded-full transition-colors ${remindersEnabled ? 'bg-cyan-200 text-cyan-800' : 'bg-white text-gray-400'}`}
+                title="Напоминания каждые 2 часа"
+            >
+                <svg className="w-4 h-4" fill={remindersEnabled ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+            </button>
             </div>
-          </div>
-          <button 
-             onClick={onToggleReminders}
-             className={`p-2 rounded-full transition-colors ${remindersEnabled ? 'bg-cyan-200 text-cyan-800' : 'bg-white text-gray-400'}`}
-             title="Напоминания каждые 2 часа"
-          >
-             <svg className="w-5 h-5" fill={remindersEnabled ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-          </button>
-        </div>
 
-        <ProgressBar current={waterIntake} max={waterGoal} color="bg-cyan-400" />
-        
-        <div className="mt-4 flex gap-3">
-          <button onClick={() => onAddWater(250)} className="flex-1 bg-white py-2 rounded-xl text-sm font-bold text-cyan-600 shadow-sm border border-cyan-100 active:scale-95 transition-all">
-            + 250 мл
-          </button>
-          <button onClick={() => onAddWater(500)} className="flex-1 bg-white py-2 rounded-xl text-sm font-bold text-cyan-600 shadow-sm border border-cyan-100 active:scale-95 transition-all">
-            + 500 мл
-          </button>
-        </div>
-      </Card>
-
-      {/* Activity / Steps */}
-      <Card>
-        <div className="flex justify-between items-center mb-3">
-          <h3 className="font-bold text-gray-800 flex items-center gap-2">
-            <div className="p-1.5 bg-red-100 rounded-lg">
-               <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" /></svg>
+            <ProgressBar current={waterIntake} max={waterGoal} color="bg-cyan-400" />
+            
+            <div className="mt-3 flex gap-2">
+            <button onClick={() => onAddWater(250)} className="flex-1 bg-white py-1.5 rounded-lg text-xs font-bold text-cyan-600 shadow-sm border border-cyan-100 active:scale-95 transition-all">
+                + 250
+            </button>
+            <button onClick={() => onAddWater(500)} className="flex-1 bg-white py-1.5 rounded-lg text-xs font-bold text-cyan-600 shadow-sm border border-cyan-100 active:scale-95 transition-all">
+                + 500
+            </button>
             </div>
-            Активность
-          </h3>
-          <span className="text-sm font-medium text-gray-600">{steps} / {profile.dailyStepGoal} шагов</span>
-        </div>
-        <ProgressBar current={steps} max={profile.dailyStepGoal} color="bg-red-500" />
-        
-        <div className="mt-4 flex gap-3">
-             <button onClick={openActivity} className="flex-1 bg-orange-50 py-3 rounded-xl text-sm font-bold text-orange-600 hover:bg-orange-100 transition-colors flex items-center justify-center gap-2">
-               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-               Тренировка
-             </button>
-             <button onClick={syncSteps} className="flex-1 bg-gray-50 py-3 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-100 transition-colors flex items-center justify-center gap-2">
-               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                Синхр.
-             </button>
-        </div>
-      </Card>
+          </Card>
+
+          {/* Activity / Steps */}
+          <Card className="col-span-2 sm:col-span-1">
+            <div className="flex justify-between items-center mb-2">
+            <h3 className="font-bold text-gray-800 flex items-center gap-2 text-sm">
+                <div className="p-1.5 bg-red-100 rounded-lg">
+                <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" /></svg>
+                </div>
+                Шаги
+            </h3>
+            <span className="text-[10px] font-medium text-gray-600">{steps} / {profile.dailyStepGoal}</span>
+            </div>
+            <ProgressBar current={steps} max={profile.dailyStepGoal} color="bg-red-500" />
+            
+            <div className="mt-3 flex gap-2">
+                <button onClick={openActivity} className="flex-1 bg-orange-50 py-1.5 rounded-lg text-xs font-bold text-orange-600 hover:bg-orange-100 transition-colors flex items-center justify-center gap-1">
+                + Треня
+                </button>
+                <button onClick={syncSteps} className="flex-1 bg-gray-50 py-1.5 rounded-lg text-xs font-bold text-gray-600 hover:bg-gray-100 transition-colors flex items-center justify-center gap-1">
+                + Шаги
+                </button>
+            </div>
+          </Card>
+
+          {/* Sleep Summary Card */}
+          <Card className="col-span-2 bg-indigo-50 border-indigo-100">
+             <div onClick={openSleepTracker} className="cursor-pointer">
+                <div className="flex justify-between items-center mb-2">
+                    <div className="flex items-center gap-2">
+                        <div className="p-1.5 bg-indigo-200 rounded-lg text-indigo-700">
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" /></svg>
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-indigo-900 text-sm">Сон</h3>
+                            {lastSleepEntry ? (
+                                <p className="text-[10px] text-indigo-600">{lastSleepEntry.durationHours} ч. • Качество {lastSleepEntry.quality}/10</p>
+                            ) : (
+                                <p className="text-[10px] text-indigo-400">Нет данных за сегодня</p>
+                            )}
+                        </div>
+                    </div>
+                    {sleepConfig && sleepConfig.wakeAlarmEnabled && (
+                        <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-full shadow-sm">
+                            <span className="text-[10px] font-bold text-indigo-600">⏰ {sleepConfig.wakeTime}</span>
+                        </div>
+                    )}
+                </div>
+                
+                {lastSleepEntry ? (
+                   <ProgressBar current={lastSleepEntry.durationHours} max={sleepConfig?.targetHours || 8} color="bg-indigo-500" />
+                ) : (
+                   <div className="bg-white/50 h-3 rounded-full w-full"></div>
+                )}
+                
+                <div className="mt-2 text-right">
+                    <span className="text-xs text-indigo-500 font-bold hover:underline">Управление сном →</span>
+                </div>
+             </div>
+          </Card>
+      </div>
 
       {/* Food History */}
       <div>

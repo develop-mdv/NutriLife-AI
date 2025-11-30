@@ -24,6 +24,21 @@ export interface ActivityEntry {
   timestamp: number;
 }
 
+export interface SleepEntry {
+  id: string;
+  durationHours: number;
+  quality: number; // 1-10
+  timestamp: number; // Date of the sleep record
+}
+
+export interface SleepConfig {
+  targetHours: number;
+  bedTime: string; // "23:00"
+  wakeTime: string; // "07:00"
+  bedTimeReminderEnabled: boolean;
+  wakeAlarmEnabled: boolean;
+}
+
 export interface UserProfile {
   name: string;
   height: number; // cm
@@ -64,10 +79,23 @@ export interface MealRemindersConfig {
   dinner: ReminderConfig;
 }
 
+export interface WalkingRoute {
+  title: string;
+  description: string;
+  estimatedSteps: number;
+  durationMinutes: number;
+  distanceKm: number;
+  startLocation: string;
+  endLocation: string;
+  isRoundTrip?: boolean;
+}
+
 export enum AppView {
   DASHBOARD = 'DASHBOARD',
   FOOD_LOG = 'FOOD_LOG',
   ACTIVITY = 'ACTIVITY',
   CHAT = 'CHAT',
-  PROFILE = 'PROFILE'
+  PROFILE = 'PROFILE',
+  WALKS = 'WALKS',
+  SLEEP = 'SLEEP'
 }

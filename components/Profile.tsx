@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { UserProfile, RoadmapStep, Achievement, MealRemindersConfig } from '../types';
-import { Card, Button, LoadingSpinner, Input } from './UI';
+import { Card, Button, LoadingSpinner, Input, ProgressBar } from './UI';
 import { generateWellnessRoadmap } from '../services/geminiService';
 
 interface ProfileProps {
@@ -11,6 +11,12 @@ interface ProfileProps {
   onUpdateRoadmap: (steps: RoadmapStep[]) => void;
   mealReminders: MealRemindersConfig;
   onUpdateMealReminders: (config: MealRemindersConfig) => void;
+  stats: {
+    calories: number;
+    steps: number;
+    water: number;
+    waterGoal: number;
+  };
 }
 
 export const Profile: React.FC<ProfileProps> = ({ 
@@ -19,7 +25,8 @@ export const Profile: React.FC<ProfileProps> = ({
   roadmap, 
   onUpdateRoadmap,
   mealReminders,
-  onUpdateMealReminders
+  onUpdateMealReminders,
+  stats
 }) => {
   const [activeTab, setActiveTab] = useState<'stats' | 'roadmap' | 'settings'>('stats');
   const [loadingRoadmap, setLoadingRoadmap] = useState(false);
@@ -183,19 +190,73 @@ export const Profile: React.FC<ProfileProps> = ({
 
       {/* STATS TAB */}
       {activeTab === 'stats' && (
-        <div className="space-y-4 animate-in slide-in-from-left-4 duration-300">
-          <h3 className="font-bold text-gray-800">Достижения</h3>
-          <div className="grid grid-cols-1 gap-3">
-             {achievements.map(a => (
-               <div key={a.id} className={`p-4 rounded-xl flex items-center gap-4 border ${a.unlocked ? 'bg-yellow-50 border-yellow-100' : 'bg-gray-50 border-gray-100 opacity-60'}`}>
-                 <div className="text-3xl">{a.icon}</div>
-                 <div>
-                   <h4 className="font-bold text-gray-900">{a.title}</h4>
-                   <p className="text-xs text-gray-500">{a.description}</p>
+        <div className="space-y-6 animate-in slide-in-from-left-4 duration-300">
+          
+          {/* Daily Goals Progress */}
+          <Card>
+            <h3 className="font-bold text-gray-800 mb-4">Цели на сегодня</h3>
+            <div className="space-y-5">
+              
+              {/* Calories */}
+              <div>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-gray-600 font-medium">Калории</span>
+                  <span className="font-bold text-gray-800">
+                    {stats.calories} <span className="text-gray-400 font-normal">/ {profile.dailyCalorieGoal}</span>
+                  </span>
+                </div>
+                <ProgressBar current={stats.calories} max={profile.dailyCalorieGoal} color="bg-emerald-500" />
+                <div className="text-right mt-1">
+                   <span className="text-[10px] text-gray-400">{Math.round((stats.calories / profile.dailyCalorieGoal) * 100)}%</span>
+                </div>
+              </div>
+
+              {/* Steps */}
+              <div>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-gray-600 font-medium">Шаги</span>
+                  <span className="font-bold text-gray-800">
+                    {stats.steps} <span className="text-gray-400 font-normal">/ {profile.dailyStepGoal}</span>
+                  </span>
+                </div>
+                <ProgressBar current={stats.steps} max={profile.dailyStepGoal} color="bg-red-500" />
+                 <div className="text-right mt-1">
+                   <span className="text-[10px] text-gray-400">{Math.round((stats.steps / profile.dailyStepGoal) * 100)}%</span>
+                </div>
+              </div>
+
+              {/* Water */}
+              <div>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-gray-600 font-medium">Вода</span>
+                  <span className="font-bold text-gray-800">
+                    {stats.water} <span className="text-gray-400 font-normal">/ {stats.waterGoal} мл</span>
+                  </span>
+                </div>
+                <ProgressBar current={stats.water} max={stats.waterGoal} color="bg-cyan-400" />
+                 <div className="text-right mt-1">
+                   <span className="text-[10px] text-gray-400">{Math.round((stats.water / stats.waterGoal) * 100)}%</span>
+                </div>
+              </div>
+
+            </div>
+          </Card>
+
+          {/* Achievements */}
+          <div>
+            <h3 className="font-bold text-gray-800 mb-3">Достижения</h3>
+            <div className="grid grid-cols-1 gap-3">
+               {achievements.map(a => (
+                 <div key={a.id} className={`p-4 rounded-xl flex items-center gap-4 border ${a.unlocked ? 'bg-yellow-50 border-yellow-100' : 'bg-gray-50 border-gray-100 opacity-60'}`}>
+                   <div className="text-3xl">{a.icon}</div>
+                   <div>
+                     <h4 className="font-bold text-gray-900">{a.title}</h4>
+                     <p className="text-xs text-gray-500">{a.description}</p>
+                   </div>
+                   {a.unlocked && <div className="ml-auto text-yellow-500">★</div>}
                  </div>
-                 {a.unlocked && <div className="ml-auto text-yellow-500">★</div>}
-               </div>
-             ))}
+               ))}
+            </div>
           </div>
         </div>
       )}
