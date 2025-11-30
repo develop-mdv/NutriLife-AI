@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Dashboard } from './components/Dashboard';
 import { FoodLogger } from './components/FoodLogger';
 import { ChatBot } from './components/ChatBot';
@@ -7,7 +7,7 @@ import { Profile } from './components/Profile';
 import { ActivityLogger } from './components/ActivityLogger';
 import { Walks } from './components/Walks';
 import { SleepTracker } from './components/SleepTracker';
-import { AppView, FoodEntry, UserProfile, Macros, ActivityEntry, RoadmapStep, MealRemindersConfig, ReminderConfig, SleepConfig, SleepEntry } from './types';
+import { AppView, FoodEntry, UserProfile, Macros, ActivityEntry, RoadmapStep, MealRemindersConfig, ReminderConfig, SleepConfig, SleepEntry, DailyStats } from './types';
 import { Button, Input } from './components/UI';
 
 // Mock Data
@@ -59,13 +59,55 @@ const App: React.FC = () => {
 
   // Water Tracking
   const [waterIntake, setWaterIntake] = useState(0);
-  const WATER_GOAL = 2500;
+  const [waterGoal, setWaterGoal] = useState(2500); // Now state instead of constant
   const [remindersEnabled, setRemindersEnabled] = useState(false);
 
   // Meal Reminders
   const [mealReminders, setMealReminders] = useState<MealRemindersConfig>(INITIAL_MEAL_REMINDERS);
   const lastNotifiedMinute = useRef<string | null>(null);
   const lastSleepNotifiedMinute = useRef<string | null>(null);
+
+  // Mock History Data Generation (Memoized to prevent regeneration on render)
+  const historyData: DailyStats[] = useMemo(() => {
+    const data: DailyStats[] = [];
+    const now = new Date();
+    
+    // Generate last 30 days
+    for (let i = 30; i > 0; i--) {
+      const d = new Date();
+      d.setDate(now.getDate() - i);
+      
+      const dateStr = d.toISOString().split('T')[0];
+      
+      // Randomize plausible data
+      data.push({
+        date: dateStr,
+        timestamp: d.getTime(),
+        calories: Math.round(1800 + Math.random() * 800), // 1800 - 2600
+        steps: Math.round(4000 + Math.random() * 10000), // 4000 - 14000
+        water: Math.round(1000 + Math.random() * 2000), // 1000 - 3000
+        sleepHours: Number((6 + Math.random() * 3).toFixed(1)) // 6 - 9 hours
+      });
+    }
+    return data;
+  }, []);
+
+  // Combine Mock History with Today's Live Data
+  const fullHistory = useMemo(() => {
+      const todayMacros = foodEntries.reduce((acc, entry) => acc + entry.macros.calories, 0);
+      const todaySleep = sleepEntries.length > 0 ? sleepEntries[sleepEntries.length - 1].durationHours : 0;
+      
+      const todayStats: DailyStats = {
+          date: new Date().toISOString().split('T')[0],
+          timestamp: Date.now(),
+          calories: Math.round(todayMacros),
+          steps: steps,
+          water: waterIntake,
+          sleepHours: todaySleep
+      };
+      
+      return [...historyData, todayStats];
+  }, [historyData, foodEntries, steps, waterIntake, sleepEntries]);
 
   useEffect(() => {
     let interval: any;
@@ -240,7 +282,7 @@ const App: React.FC = () => {
             steps={steps}
             foodEntries={foodEntries}
             waterIntake={waterIntake}
-            waterGoal={WATER_GOAL}
+            waterGoal={waterGoal}
             remindersEnabled={remindersEnabled}
             sleepConfig={sleepConfig}
             lastSleepEntry={lastSleepEntry}
@@ -295,8 +337,12 @@ const App: React.FC = () => {
               calories: Math.round(todayMacros.calories),
               steps: steps,
               water: waterIntake,
-              waterGoal: WATER_GOAL
+              waterGoal: waterGoal
             }}
+            setWaterGoal={setWaterGoal}
+            sleepConfig={sleepConfig}
+            onUpdateSleepConfig={setSleepConfig}
+            history={fullHistory}
           />
         );
       case AppView.WALKS:

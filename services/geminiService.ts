@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type, Schema, LiveServerMessage, Modality } from "@google/genai";
-import { Macros, RoadmapStep, WalkingRoute } from "../types";
+import { Macros, RoadmapStep, WalkingRoute, RoadmapTargets } from "../types";
 
 const apiKey = process.env.API_KEY || "";
 const ai = new GoogleGenAI({ apiKey });
@@ -11,6 +11,7 @@ export const analyzeFoodImage = async (base64Image: string): Promise<{
   name: string;
   macros: Macros;
   rating: number;
+  ratingDescription: string;
   recommendation: string;
 }> => {
   try {
@@ -25,7 +26,7 @@ export const analyzeFoodImage = async (base64Image: string): Promise<{
             },
           },
           {
-            text: "Проанализируй это фото еды. Определи название блюда на русском языке, оцени калорийность, белки (г), жиры (г) и углеводы (г) для показанной порции. Оцени полезность от 1 до 10 (10 — самое полезное) и дай краткую рекомендацию на русском языке.",
+            text: "Проанализируй это фото еды. Определи название блюда на русском языке, оцени калорийность, белки (г), жиры (г) и углеводы (г) для показанной порции. Оцени полезность от 1 до 10 (10 — самое полезное). В поле ratingDescription объясни, почему поставлена такая оценка (опираясь на состав и КБЖУ). Дай краткую рекомендацию.",
           },
         ],
       },
@@ -40,9 +41,10 @@ export const analyzeFoodImage = async (base64Image: string): Promise<{
             fat: { type: Type.NUMBER },
             carbs: { type: Type.NUMBER },
             rating: { type: Type.NUMBER },
+            ratingDescription: { type: Type.STRING },
             recommendation: { type: Type.STRING },
           },
-          required: ["name", "calories", "protein", "fat", "carbs", "rating", "recommendation"],
+          required: ["name", "calories", "protein", "fat", "carbs", "rating", "ratingDescription", "recommendation"],
         },
       },
     });
@@ -60,6 +62,7 @@ export const analyzeFoodImage = async (base64Image: string): Promise<{
         carbs: result.carbs,
       },
       rating: result.rating,
+      ratingDescription: result.ratingDescription,
       recommendation: result.recommendation,
     };
   } catch (error) {
@@ -132,21 +135,29 @@ export const sendChatMessage = async (
 
 // --- Roadmap Generation ---
 
-export const generateWellnessRoadmap = async (userProfile: any, wishes?: string): Promise<RoadmapStep[]> => {
+export const generateWellnessRoadmap = async (userProfile: any, wishes?: string): Promise<{steps: RoadmapStep[], targets: RoadmapTargets} | null> => {
   try {
     const prompt = `Создай план оздоровления из 5 конкретных шагов для пользователя.
+    
     Данные профиля:
     - Цель: ${userProfile.goal}
-    - Возраст: ${userProfile.age}, Вес: ${userProfile.weight}, Рост: ${userProfile.height}
+    - Возраст: ${userProfile.age}, Вес: ${userProfile.weight}, Рост: ${userProfile.height}, Пол: ${userProfile.gender}, Активность: ${userProfile.activityLevel}
     ${userProfile.allergies ? `- Аллергии: ${userProfile.allergies}` : ""}
     ${userProfile.preferences ? `- Предпочтения в еде: ${userProfile.preferences}` : ""}
     ${userProfile.healthConditions ? `- Ограничения здоровья: ${userProfile.healthConditions}` : ""}
     
-    ВКЛЮЧИ в план хотя бы один пункт, касающийся РЕЖИМА СНА и восстановления, если это уместно для цели.
+    ЗАДАЧА 1: Рассчитай конкретные целевые показатели (targets) на день:
+    - dailyCalories: Используй формулу Миффлина-Сан Жеора с учетом активности и цели.
+    - dailyWater: Рекомендуемый объем воды в мл (обычно 30-35 мл на кг).
+    - dailySteps: Рекомендуемое количество шагов (например, 7000-12000).
+    - sleepHours: Рекомендуемая продолжительность сна (обычно 7-9).
+    
+    ЗАДАЧА 2: Составь план (steps) из 5 пунктов.
+    ВКЛЮЧИ в план хотя бы один пункт, касающийся РЕЖИМА СНА и восстановления, если это уместно.
     
     ${wishes ? `ОСОБЫЕ ПОЖЕЛАНИЯ ПОЛЬЗОВАТЕЛЯ (УЧТИ ОБЯЗАТЕЛЬНО): ${wishes}` : ""}
     
-    Верни JSON массив. Каждый шаг должен содержать 'title' (краткий заголовок), 'description' (конкретное действие) и 'status' (всегда "pending").
+    Верни JSON объект.
     Язык: Русский.`;
 
     const response = await ai.models.generateContent({
@@ -155,26 +166,42 @@ export const generateWellnessRoadmap = async (userProfile: any, wishes?: string)
       config: {
         responseMimeType: "application/json",
         responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              title: { type: Type.STRING },
-              description: { type: Type.STRING },
-              status: { type: Type.STRING, enum: ["pending"] }
-            },
-            required: ["title", "description", "status"]
-          }
+          type: Type.OBJECT,
+          properties: {
+             targets: {
+                 type: Type.OBJECT,
+                 properties: {
+                     dailyCalories: { type: Type.NUMBER },
+                     dailyWater: { type: Type.NUMBER },
+                     dailySteps: { type: Type.NUMBER },
+                     sleepHours: { type: Type.NUMBER }
+                 },
+                 required: ["dailyCalories", "dailyWater", "dailySteps", "sleepHours"]
+             },
+             steps: {
+                 type: Type.ARRAY,
+                 items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      title: { type: Type.STRING },
+                      description: { type: Type.STRING },
+                      status: { type: Type.STRING, enum: ["pending"] }
+                    },
+                    required: ["title", "description", "status"]
+                 }
+             }
+          },
+          required: ["targets", "steps"]
         }
       }
     });
 
     const text = response.text;
-    if (!text) return [];
-    return JSON.parse(text) as RoadmapStep[];
+    if (!text) return null;
+    return JSON.parse(text);
   } catch (error) {
     console.error("Roadmap generation failed", error);
-    return [];
+    return null;
   }
 }
 
@@ -464,6 +491,7 @@ export class LiveClient {
     this.sessionPromise?.then(session => session.close());
     this.stream?.getTracks().forEach(t => t.stop());
     
+    // Check state before closing to prevent "Cannot close a closed AudioContext"
     if (this.inputAudioContext && this.inputAudioContext.state !== 'closed') {
       this.inputAudioContext.close();
     }

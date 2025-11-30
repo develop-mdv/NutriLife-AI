@@ -127,7 +127,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
              <span className="font-bold text-sm" style={{color: data.fill}}>{data.name}</span>
              <span className="font-bold text-gray-800 text-sm">{Math.round(data.amount)} г</span>
           </div>
-          <div className="text-gray-400 text-[10px]">
+          <div className="text-gray-500 text-[10px]">
             {Math.round(data.percent)}% от дневной нормы
           </div>
         </div>
@@ -178,7 +178,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
              <span className="text-4xl font-bold text-gray-800 tracking-tight">
                 {showConsumed ? caloriesConsumed : Math.round(caloriesLeft)}
              </span>
-             <span className="text-xs text-gray-400 font-medium uppercase tracking-wider mb-1">
+             <span className="text-xs text-gray-500 font-medium uppercase tracking-wider mb-1">
                 {showConsumed ? 'ккал съедено' : 'ккал ост.'}
              </span>
              {!showConsumed && burnedCalories > 0 && (
@@ -187,7 +187,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                </span>
              )}
               {showConsumed && (
-               <span className="text-xs text-gray-400 font-medium">
+               <span className="text-xs text-gray-500 font-medium">
                  из {profile.dailyCalorieGoal}
                </span>
              )}
@@ -197,26 +197,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="grid grid-cols-3 gap-4 w-full mt-2 text-center">
            <div className="flex flex-col items-center">
              <div className="w-2 h-2 rounded-full bg-emerald-400 mb-1"></div>
-             <div className="text-xs text-gray-400 uppercase font-bold">Белки</div>
+             <div className="text-xs text-gray-500 uppercase font-bold">Белки</div>
              <div className="font-bold text-gray-800 text-lg leading-none mt-1">
                  {Math.round(todayMacros.protein)}
-                 <span className="text-xs text-gray-400 font-medium ml-0.5">/{macroGoals.protein}г</span>
+                 <span className="text-xs text-gray-500 font-medium ml-0.5">/{macroGoals.protein}г</span>
              </div>
            </div>
            <div className="flex flex-col items-center">
              <div className="w-2 h-2 rounded-full bg-amber-400 mb-1"></div>
-             <div className="text-xs text-gray-400 uppercase font-bold">Жиры</div>
+             <div className="text-xs text-gray-500 uppercase font-bold">Жиры</div>
              <div className="font-bold text-gray-800 text-lg leading-none mt-1">
                 {Math.round(todayMacros.fat)}
-                <span className="text-xs text-gray-400 font-medium ml-0.5">/{macroGoals.fat}г</span>
+                <span className="text-xs text-gray-500 font-medium ml-0.5">/{macroGoals.fat}г</span>
              </div>
            </div>
            <div className="flex flex-col items-center">
              <div className="w-2 h-2 rounded-full bg-blue-400 mb-1"></div>
-             <div className="text-xs text-gray-400 uppercase font-bold">Углев.</div>
+             <div className="text-xs text-gray-500 uppercase font-bold">Углев.</div>
              <div className="font-bold text-gray-800 text-lg leading-none mt-1">
                 {Math.round(todayMacros.carbs)}
-                <span className="text-xs text-gray-400 font-medium ml-0.5">/{macroGoals.carbs}г</span>
+                <span className="text-xs text-gray-500 font-medium ml-0.5">/{macroGoals.carbs}г</span>
              </div>
            </div>
         </div>
@@ -361,7 +361,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
              <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-2 text-gray-400">
                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
              </div>
-             <p className="text-gray-500 text-sm">Нет записей за выбранный период.</p>
+             <p className="text-gray-600 text-sm">Нет записей за выбранный период.</p>
              {filterType === 'today' && (
                  <button onClick={openCamera} className="mt-2 text-primary font-bold text-sm">Добавить +</button>
              )}
@@ -404,16 +404,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
                          <div className="text-xs text-gray-500 flex justify-between items-center mt-1">
                             <div className="flex items-center gap-2">
                                 <span className={`${entry.rating >= 7 ? 'text-emerald-500' : 'text-amber-500'} font-medium`}>{entry.rating}/10</span>
-                                <span className="text-gray-300">•</span>
+                                <span className="text-gray-400">•</span>
                                 <span>{new Date(entry.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                                 {filterType !== 'today' && (
                                     <>
-                                        <span className="text-gray-300">•</span>
+                                        <span className="text-gray-400">•</span>
                                         <span>{new Date(entry.timestamp).toLocaleDateString()}</span>
                                     </>
                                 )}
                             </div>
-                            <svg className={`w-4 h-4 text-gray-300 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                             </svg>
                          </div>
@@ -441,7 +441,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                           {/* Contribution Chart */}
                           <div className="mb-3">
-                             <h5 className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2 text-center">Вклад в дневную цель (%)</h5>
+                             <h5 className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-2 text-center">Вклад в дневную цель (%)</h5>
                              <div className="h-24 w-full">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart data={chartData} layout="vertical" margin={{ top: 0, right: 20, left: 10, bottom: 0 }}>

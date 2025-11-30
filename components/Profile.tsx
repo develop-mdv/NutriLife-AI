@@ -1,8 +1,9 @@
 
-import React, { useState, useEffect } from 'react';
-import { UserProfile, RoadmapStep, Achievement, MealRemindersConfig } from '../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { UserProfile, RoadmapStep, Achievement, MealRemindersConfig, SleepConfig, DailyStats } from '../types';
 import { Card, Button, LoadingSpinner, Input, ProgressBar } from './UI';
 import { generateWellnessRoadmap } from '../services/geminiService';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid } from 'recharts';
 
 interface ProfileProps {
   profile: UserProfile;
@@ -17,6 +18,10 @@ interface ProfileProps {
     water: number;
     waterGoal: number;
   };
+  setWaterGoal: (goal: number) => void;
+  sleepConfig: SleepConfig;
+  onUpdateSleepConfig: (config: SleepConfig) => void;
+  history: DailyStats[];
 }
 
 export const Profile: React.FC<ProfileProps> = ({ 
@@ -26,9 +31,16 @@ export const Profile: React.FC<ProfileProps> = ({
   onUpdateRoadmap,
   mealReminders,
   onUpdateMealReminders,
-  stats
+  stats,
+  setWaterGoal,
+  sleepConfig,
+  onUpdateSleepConfig,
+  history
 }) => {
   const [activeTab, setActiveTab] = useState<'stats' | 'roadmap' | 'settings'>('stats');
+  const [statsView, setStatsView] = useState<'today' | 'history'>('today'); // New sub-state for Stats tab
+  const [historyPeriod, setHistoryPeriod] = useState<'week' | 'month'>('week');
+
   const [loadingRoadmap, setLoadingRoadmap] = useState(false);
   const [isEditingGoal, setIsEditingGoal] = useState(false);
   
@@ -36,27 +48,45 @@ export const Profile: React.FC<ProfileProps> = ({
   const [isAdjustingPlan, setIsAdjustingPlan] = useState(false);
   const [wishes, setWishes] = useState('');
 
+  // Helper to load/generate roadmap and update goals
+  const performRoadmapGeneration = async (userWishes?: string) => {
+       setLoadingRoadmap(true);
+       setIsAdjustingPlan(false);
+       
+       const result = await generateWellnessRoadmap(profile, userWishes);
+       
+       if (result) {
+           // 1. Update Roadmap Steps
+           onUpdateRoadmap(result.steps);
+           
+           // 2. Apply Numeric Targets to Profile
+           if (result.targets) {
+              onUpdateProfile({
+                  ...profile,
+                  dailyCalorieGoal: result.targets.dailyCalories,
+                  dailyStepGoal: result.targets.dailySteps
+              });
+              setWaterGoal(result.targets.dailyWater);
+              onUpdateSleepConfig({
+                  ...sleepConfig,
+                  targetHours: result.targets.sleepHours
+              });
+           }
+       }
+       
+       setLoadingRoadmap(false);
+       setWishes(''); 
+  };
+
   // Initial load if empty
   useEffect(() => {
-    const loadRoadmap = async () => {
-       setLoadingRoadmap(true);
-       const steps = await generateWellnessRoadmap(profile);
-       onUpdateRoadmap(steps);
-       setLoadingRoadmap(false);
-    };
-    
     if (activeTab === 'roadmap' && roadmap.length === 0 && !loadingRoadmap) {
-      loadRoadmap();
+      performRoadmapGeneration();
     }
   }, [activeTab, roadmap.length]); 
 
-  const handleAdjustPlan = async () => {
-    setLoadingRoadmap(true);
-    setIsAdjustingPlan(false);
-    const steps = await generateWellnessRoadmap(profile, wishes);
-    onUpdateRoadmap(steps);
-    setLoadingRoadmap(false);
-    setWishes(''); 
+  const handleAdjustPlan = () => {
+    performRoadmapGeneration(wishes);
   };
 
   const handleToggleReminder = (meal: keyof MealRemindersConfig) => {
@@ -84,11 +114,104 @@ export const Profile: React.FC<ProfileProps> = ({
     });
   };
 
-  const achievements: Achievement[] = [
-    { id: '1', title: 'Ранняя пташка', description: 'Завтрак до 9 утра', icon: '🌅', unlocked: true },
-    { id: '2', title: 'Мастер БЖУ', description: 'Норма белка 3 дня подряд', icon: '🥩', unlocked: false },
-    { id: '3', title: 'Марафонец', description: '15 тыс. шагов за день', icon: '👟', unlocked: true },
-  ];
+  // --- HISTORY CALCULATIONS ---
+  const filteredHistory = useMemo(() => {
+    const days = historyPeriod === 'week' ? 7 : 30;
+    // Sort oldest to newest for charts
+    return [...history]
+      .sort((a, b) => a.timestamp - b.timestamp)
+      .slice(-days);
+  }, [history, historyPeriod]);
+
+  const averages = useMemo(() => {
+    if (filteredHistory.length === 0) return { calories: 0, steps: 0, water: 0, sleep: 0 };
+    
+    const total = filteredHistory.reduce((acc, curr) => ({
+       calories: acc.calories + curr.calories,
+       steps: acc.steps + curr.steps,
+       water: acc.water + curr.water,
+       sleep: acc.sleep + curr.sleepHours
+    }), { calories: 0, steps: 0, water: 0, sleep: 0 });
+
+    return {
+       calories: Math.round(total.calories / filteredHistory.length),
+       steps: Math.round(total.steps / filteredHistory.length),
+       water: Math.round(total.water / filteredHistory.length),
+       sleep: Number((total.sleep / filteredHistory.length).toFixed(1))
+    };
+  }, [filteredHistory]);
+
+  // --- DYNAMIC ACHIEVEMENTS ---
+  const achievements: Achievement[] = useMemo(() => {
+      // Logic checks
+      const hasHistory = history.length > 0;
+      const waterGoalMet = stats.water >= stats.waterGoal;
+      const stepsGoalMet = stats.steps >= profile.dailyStepGoal;
+      const calorieSniper = stats.calories > 0 && Math.abs(stats.calories - profile.dailyCalorieGoal) <= (profile.dailyCalorieGoal * 0.15); // +/- 15%
+      const roadmapCreated = roadmap.length > 0;
+      const earlyBird = sleepConfig.wakeAlarmEnabled && parseInt(sleepConfig.wakeTime.split(':')[0]) < 8;
+      const weekStreak = history.length >= 7;
+      const hydrationMaster = history.filter(d => d.water >= 2000).length >= 3;
+
+      return [
+        { 
+            id: '1', 
+            title: 'Начало пути', 
+            description: 'Первая запись в истории', 
+            icon: '🚀', 
+            unlocked: hasHistory 
+        },
+        { 
+            id: '2', 
+            title: 'Водный баланс', 
+            description: 'Выполнена цель по воде сегодня', 
+            icon: '💧', 
+            unlocked: waterGoalMet 
+        },
+        { 
+            id: '3', 
+            title: 'Активный образ', 
+            description: 'Выполнена цель по шагам сегодня', 
+            icon: '👟', 
+            unlocked: stepsGoalMet 
+        },
+        { 
+            id: '4', 
+            title: 'Снайпер калорий', 
+            description: 'Попадание в норму калорий (±15%)', 
+            icon: '🎯', 
+            unlocked: calorieSniper 
+        },
+        { 
+            id: '5', 
+            title: 'Стратег', 
+            description: 'Создан персональный план здоровья', 
+            icon: '🗺️', 
+            unlocked: roadmapCreated 
+        },
+        { 
+            id: '6', 
+            title: 'Ранняя пташка', 
+            description: 'Будильник установлен до 08:00', 
+            icon: '🌅', 
+            unlocked: earlyBird 
+        },
+        { 
+            id: '7', 
+            title: 'Постоянство', 
+            description: 'Использование приложения 7 дней', 
+            icon: '🔥', 
+            unlocked: weekStreak 
+        },
+        { 
+            id: '8', 
+            title: 'Аквамен', 
+            description: 'Более 2л воды 3 дня в истории', 
+            icon: '🔱', 
+            unlocked: hydrationMaster 
+        }
+      ];
+  }, [stats, profile, roadmap, sleepConfig, history]);
 
   const translateGoal = (goal: string) => {
     switch(goal) {
@@ -166,7 +289,7 @@ export const Profile: React.FC<ProfileProps> = ({
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Main Tabs */}
       <div className="flex bg-gray-100 p-1 rounded-xl">
         <button 
           onClick={() => setActiveTab('stats')}
@@ -188,76 +311,207 @@ export const Profile: React.FC<ProfileProps> = ({
         </button>
       </div>
 
-      {/* STATS TAB */}
+      {/* STATS TAB CONTENT */}
       {activeTab === 'stats' && (
         <div className="space-y-6 animate-in slide-in-from-left-4 duration-300">
           
-          {/* Daily Goals Progress */}
-          <Card>
-            <h3 className="font-bold text-gray-800 mb-4">Цели на сегодня</h3>
-            <div className="space-y-5">
-              
-              {/* Calories */}
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-600 font-medium">Калории</span>
-                  <span className="font-bold text-gray-800">
-                    {stats.calories} <span className="text-gray-400 font-normal">/ {profile.dailyCalorieGoal}</span>
-                  </span>
-                </div>
-                <ProgressBar current={stats.calories} max={profile.dailyCalorieGoal} color="bg-emerald-500" />
-                <div className="text-right mt-1">
-                   <span className="text-[10px] text-gray-400">{Math.round((stats.calories / profile.dailyCalorieGoal) * 100)}%</span>
-                </div>
-              </div>
-
-              {/* Steps */}
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-600 font-medium">Шаги</span>
-                  <span className="font-bold text-gray-800">
-                    {stats.steps} <span className="text-gray-400 font-normal">/ {profile.dailyStepGoal}</span>
-                  </span>
-                </div>
-                <ProgressBar current={stats.steps} max={profile.dailyStepGoal} color="bg-red-500" />
-                 <div className="text-right mt-1">
-                   <span className="text-[10px] text-gray-400">{Math.round((stats.steps / profile.dailyStepGoal) * 100)}%</span>
-                </div>
-              </div>
-
-              {/* Water */}
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-600 font-medium">Вода</span>
-                  <span className="font-bold text-gray-800">
-                    {stats.water} <span className="text-gray-400 font-normal">/ {stats.waterGoal} мл</span>
-                  </span>
-                </div>
-                <ProgressBar current={stats.water} max={stats.waterGoal} color="bg-cyan-400" />
-                 <div className="text-right mt-1">
-                   <span className="text-[10px] text-gray-400">{Math.round((stats.water / stats.waterGoal) * 100)}%</span>
-                </div>
-              </div>
-
-            </div>
-          </Card>
-
-          {/* Achievements */}
-          <div>
-            <h3 className="font-bold text-gray-800 mb-3">Достижения</h3>
-            <div className="grid grid-cols-1 gap-3">
-               {achievements.map(a => (
-                 <div key={a.id} className={`p-4 rounded-xl flex items-center gap-4 border ${a.unlocked ? 'bg-yellow-50 border-yellow-100' : 'bg-gray-50 border-gray-100 opacity-60'}`}>
-                   <div className="text-3xl">{a.icon}</div>
-                   <div>
-                     <h4 className="font-bold text-gray-900">{a.title}</h4>
-                     <p className="text-xs text-gray-500">{a.description}</p>
-                   </div>
-                   {a.unlocked && <div className="ml-auto text-yellow-500">★</div>}
-                 </div>
-               ))}
-            </div>
+          {/* Sub-Tabs for Stats (Today / History) */}
+          <div className="flex justify-center mb-4">
+             <div className="flex bg-gray-100 p-1 rounded-lg w-full max-w-xs">
+                <button
+                    onClick={() => setStatsView('today')}
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${statsView === 'today' ? 'bg-white shadow text-primary' : 'text-gray-500'}`}
+                >
+                    Сегодня
+                </button>
+                <button
+                    onClick={() => setStatsView('history')}
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${statsView === 'history' ? 'bg-white shadow text-primary' : 'text-gray-500'}`}
+                >
+                    История
+                </button>
+             </div>
           </div>
+
+          {statsView === 'today' ? (
+              /* TODAY VIEW */
+              <>
+                <Card>
+                    <h3 className="font-bold text-gray-800 mb-4">Цели на сегодня</h3>
+                    <div className="space-y-5">
+                    
+                    {/* Calories */}
+                    <div>
+                        <div className="flex justify-between text-sm mb-1">
+                        <span className="text-gray-600 font-medium">Калории</span>
+                        <span className="font-bold text-gray-800">
+                            {stats.calories} <span className="text-gray-400 font-normal">/ {profile.dailyCalorieGoal}</span>
+                        </span>
+                        </div>
+                        <ProgressBar current={stats.calories} max={profile.dailyCalorieGoal} color="bg-emerald-500" />
+                        <div className="text-right mt-1">
+                           <span className="text-[10px] text-gray-400">{Math.round((stats.calories / profile.dailyCalorieGoal) * 100)}%</span>
+                        </div>
+                    </div>
+
+                    {/* Steps */}
+                    <div>
+                        <div className="flex justify-between text-sm mb-1">
+                        <span className="text-gray-600 font-medium">Шаги</span>
+                        <span className="font-bold text-gray-800">
+                            {stats.steps} <span className="text-gray-400 font-normal">/ {profile.dailyStepGoal}</span>
+                        </span>
+                        </div>
+                        <ProgressBar current={stats.steps} max={profile.dailyStepGoal} color="bg-red-500" />
+                         <div className="text-right mt-1">
+                           <span className="text-[10px] text-gray-400">{Math.round((stats.steps / profile.dailyStepGoal) * 100)}%</span>
+                        </div>
+                    </div>
+
+                    {/* Water */}
+                    <div>
+                        <div className="flex justify-between text-sm mb-1">
+                        <span className="text-gray-600 font-medium">Вода</span>
+                        <span className="font-bold text-gray-800">
+                            {stats.water} <span className="text-gray-400 font-normal">/ {stats.waterGoal} мл</span>
+                        </span>
+                        </div>
+                        <ProgressBar current={stats.water} max={stats.waterGoal} color="bg-cyan-400" />
+                         <div className="text-right mt-1">
+                           <span className="text-[10px] text-gray-400">{Math.round((stats.water / stats.waterGoal) * 100)}%</span>
+                        </div>
+                    </div>
+
+                    </div>
+                </Card>
+
+                {/* Achievements */}
+                <div>
+                    <h3 className="font-bold text-gray-800 mb-3">Достижения</h3>
+                    <div className="grid grid-cols-2 gap-3">
+                    {achievements.map(a => (
+                        <div 
+                          key={a.id} 
+                          className={`p-3 rounded-xl flex flex-col items-center text-center gap-2 border transition-all ${a.unlocked ? 'bg-yellow-50 border-yellow-200 shadow-sm' : 'bg-gray-50 border-gray-100 opacity-60 grayscale'}`}
+                        >
+                            <div className="text-3xl filter-none">{a.icon}</div>
+                            <div>
+                                <h4 className={`font-bold text-sm leading-tight ${a.unlocked ? 'text-gray-900' : 'text-gray-500'}`}>{a.title}</h4>
+                                <p className="text-[10px] text-gray-500 mt-1 leading-tight">{a.description}</p>
+                            </div>
+                            {a.unlocked && <div className="text-xs text-yellow-600 font-bold bg-yellow-100 px-2 py-0.5 rounded-full mt-auto">Открыто</div>}
+                            {!a.unlocked && <div className="text-xs text-gray-400 font-medium bg-gray-100 px-2 py-0.5 rounded-full mt-auto">Закрыто</div>}
+                        </div>
+                    ))}
+                    </div>
+                </div>
+              </>
+          ) : (
+              /* HISTORY VIEW */
+              <div className="space-y-6 animate-in slide-in-from-right-2 duration-300">
+                  <div className="flex justify-between items-center px-1">
+                      <h3 className="font-bold text-gray-800 text-lg">Обзор</h3>
+                      <div className="flex bg-gray-100 p-0.5 rounded-lg">
+                          <button onClick={() => setHistoryPeriod('week')} className={`px-3 py-1 text-xs rounded-md transition-all font-medium ${historyPeriod === 'week' ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}>Неделя</button>
+                          <button onClick={() => setHistoryPeriod('month')} className={`px-3 py-1 text-xs rounded-md transition-all font-medium ${historyPeriod === 'month' ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}>Месяц</button>
+                      </div>
+                  </div>
+
+                  {/* Averages Cards */}
+                  <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-xl">
+                          <div className="text-[10px] text-emerald-600 uppercase font-bold tracking-wider mb-1">Ср. Калории</div>
+                          <div className="text-xl font-bold text-emerald-900">{averages.calories}</div>
+                          <div className="text-[10px] text-emerald-600/70">ккал / день</div>
+                      </div>
+                      <div className="bg-red-50 border border-red-100 p-3 rounded-xl">
+                          <div className="text-[10px] text-red-600 uppercase font-bold tracking-wider mb-1">Ср. Шаги</div>
+                          <div className="text-xl font-bold text-red-900">{averages.steps}</div>
+                          <div className="text-[10px] text-red-600/70">шагов / день</div>
+                      </div>
+                      <div className="bg-indigo-50 border border-indigo-100 p-3 rounded-xl">
+                          <div className="text-[10px] text-indigo-600 uppercase font-bold tracking-wider mb-1">Ср. Сон</div>
+                          <div className="text-xl font-bold text-indigo-900">{averages.sleep} ч</div>
+                      </div>
+                       <div className="bg-cyan-50 border border-cyan-100 p-3 rounded-xl">
+                          <div className="text-[10px] text-cyan-600 uppercase font-bold tracking-wider mb-1">Ср. Вода</div>
+                          <div className="text-xl font-bold text-cyan-900">{averages.water} мл</div>
+                      </div>
+                  </div>
+
+                  {/* Charts */}
+                  <Card>
+                      <h4 className="text-sm font-bold text-gray-700 mb-4">Динамика калорий</h4>
+                      <div className="h-48 text-xs">
+                          <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={filteredHistory}>
+                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                                  <XAxis 
+                                    dataKey="date" 
+                                    tickFormatter={(val) => new Date(val).getDate().toString()} 
+                                    tick={{fill: '#9CA3AF'}} 
+                                    axisLine={false} 
+                                    tickLine={false}
+                                  />
+                                  <YAxis hide domain={[0, 'auto']} />
+                                  <Tooltip 
+                                    cursor={{fill: '#F3F4F6'}} 
+                                    contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'}}
+                                  />
+                                  <Bar dataKey="calories" fill="#34D399" radius={[4, 4, 0, 0]} name="Калории" />
+                              </BarChart>
+                          </ResponsiveContainer>
+                      </div>
+                  </Card>
+
+                   <Card>
+                      <h4 className="text-sm font-bold text-gray-700 mb-4">Динамика шагов</h4>
+                      <div className="h-48 text-xs">
+                          <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={filteredHistory}>
+                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                                  <XAxis 
+                                    dataKey="date" 
+                                    tickFormatter={(val) => new Date(val).getDate().toString()} 
+                                    tick={{fill: '#9CA3AF'}} 
+                                    axisLine={false} 
+                                    tickLine={false}
+                                  />
+                                  <YAxis hide domain={[0, 'auto']} />
+                                  <Tooltip 
+                                    cursor={{fill: '#F3F4F6'}} 
+                                    contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'}}
+                                  />
+                                  <Bar dataKey="steps" fill="#EF4444" radius={[4, 4, 0, 0]} name="Шаги" />
+                              </BarChart>
+                          </ResponsiveContainer>
+                      </div>
+                  </Card>
+                  
+                  <Card>
+                      <h4 className="text-sm font-bold text-gray-700 mb-4">Сон (часы)</h4>
+                      <div className="h-48 text-xs">
+                          <ResponsiveContainer width="100%" height="100%">
+                              <LineChart data={filteredHistory}>
+                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                                  <XAxis 
+                                    dataKey="date" 
+                                    tickFormatter={(val) => new Date(val).getDate().toString()} 
+                                    tick={{fill: '#9CA3AF'}} 
+                                    axisLine={false} 
+                                    tickLine={false}
+                                  />
+                                  <YAxis hide domain={[0, 12]} />
+                                  <Tooltip 
+                                    contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'}}
+                                  />
+                                  <Line type="monotone" dataKey="sleepHours" stroke="#6366F1" strokeWidth={3} dot={false} name="Сон" />
+                              </LineChart>
+                          </ResponsiveContainer>
+                      </div>
+                  </Card>
+              </div>
+          )}
         </div>
       )}
 
@@ -267,7 +521,7 @@ export const Profile: React.FC<ProfileProps> = ({
           {loadingRoadmap ? (
             <div className="py-12 flex flex-col items-center">
               <LoadingSpinner />
-              <p className="text-gray-500 mt-4 animate-pulse">ИИ составляет ваш персональный план...</p>
+              <p className="text-gray-500 mt-4 animate-pulse">ИИ составляет ваш персональный план и рассчитывает цели...</p>
             </div>
           ) : (
             <>
@@ -361,7 +615,7 @@ export const Profile: React.FC<ProfileProps> = ({
                 
                 <div className="grid grid-cols-2 gap-4">
                     <div>
-                        <label className="text-xs text-gray-500 uppercase font-bold">Рост (см)</label>
+                        <label className="text-xs text-gray-700 uppercase font-bold">Рост (см)</label>
                         <Input 
                             type="number" 
                             value={profile.height} 
@@ -369,7 +623,7 @@ export const Profile: React.FC<ProfileProps> = ({
                         />
                     </div>
                     <div>
-                        <label className="text-xs text-gray-500 uppercase font-bold">Вес (кг)</label>
+                        <label className="text-xs text-gray-700 uppercase font-bold">Вес (кг)</label>
                         <Input 
                             type="number" 
                             value={profile.weight} 
@@ -377,7 +631,7 @@ export const Profile: React.FC<ProfileProps> = ({
                         />
                     </div>
                     <div>
-                        <label className="text-xs text-gray-500 uppercase font-bold">Возраст</label>
+                        <label className="text-xs text-gray-700 uppercase font-bold">Возраст</label>
                         <Input 
                             type="number" 
                             value={profile.age} 
@@ -385,7 +639,7 @@ export const Profile: React.FC<ProfileProps> = ({
                         />
                     </div>
                      <div>
-                        <label className="text-xs text-gray-500 uppercase font-bold">Имя</label>
+                        <label className="text-xs text-gray-700 uppercase font-bold">Имя</label>
                         <Input 
                             type="text" 
                             value={profile.name} 
@@ -409,7 +663,7 @@ export const Profile: React.FC<ProfileProps> = ({
 
                 <div className="space-y-4">
                     <div>
-                        <label className="text-xs text-gray-500 uppercase font-bold">Аллергии</label>
+                        <label className="text-xs text-gray-700 uppercase font-bold">Аллергии</label>
                         <textarea 
                             className="w-full bg-gray-50 border border-gray-200 text-gray-800 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all text-sm mt-1"
                             rows={2}
@@ -419,7 +673,7 @@ export const Profile: React.FC<ProfileProps> = ({
                         />
                     </div>
                     <div>
-                        <label className="text-xs text-gray-500 uppercase font-bold">Предпочтения в еде</label>
+                        <label className="text-xs text-gray-700 uppercase font-bold">Предпочтения в еде</label>
                         <textarea 
                             className="w-full bg-gray-50 border border-gray-200 text-gray-800 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all text-sm mt-1"
                             rows={2}
@@ -429,7 +683,7 @@ export const Profile: React.FC<ProfileProps> = ({
                         />
                     </div>
                     <div>
-                        <label className="text-xs text-gray-500 uppercase font-bold">Ограничения по здоровью</label>
+                        <label className="text-xs text-gray-700 uppercase font-bold">Ограничения по здоровью</label>
                         <textarea 
                             className="w-full bg-gray-50 border border-gray-200 text-gray-800 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all text-sm mt-1"
                             rows={2}

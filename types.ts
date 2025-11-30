@@ -60,6 +60,13 @@ export interface RoadmapStep {
   status: 'pending' | 'in_progress' | 'completed';
 }
 
+export interface RoadmapTargets {
+  dailyCalories: number;
+  dailyWater: number;
+  dailySteps: number;
+  sleepHours: number;
+}
+
 export interface Achievement {
   id: string;
   title: string;
@@ -88,6 +95,15 @@ export interface WalkingRoute {
   startLocation: string;
   endLocation: string;
   isRoundTrip?: boolean;
+}
+
+export interface DailyStats {
+  date: string; // YYYY-MM-DD
+  timestamp: number;
+  calories: number;
+  steps: number;
+  water: number;
+  sleepHours: number;
 }
 
 export enum AppView {

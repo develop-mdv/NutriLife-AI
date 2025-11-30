@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Button, Input, Card, LoadingSpinner } from './UI';
 import { analyzeFoodImage } from '../services/geminiService';
@@ -12,7 +13,7 @@ interface FoodLoggerProps {
 export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSave, onCancel, initialEntry }) => {
   const [step, setStep] = useState<'capture' | 'analyzing' | 'review'>('capture');
   const [image, setImage] = useState<string | null>(null);
-  const [analysis, setAnalysis] = useState<{name: string, macros: Macros, rating: number, recommendation: string} | null>(null);
+  const [analysis, setAnalysis] = useState<{name: string, macros: Macros, rating: number, ratingDescription?: string, recommendation: string} | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -57,12 +58,17 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSave, onCancel, initia
 
   const handleSave = () => {
     if (analysis) {
+      // Append rating description to recommendation to persist it in the history
+      const fullRecommendation = analysis.ratingDescription 
+        ? `${analysis.ratingDescription}\n\n${analysis.recommendation}` 
+        : analysis.recommendation;
+
       onSave({
         id: initialEntry ? initialEntry.id : Date.now().toString(),
         name: analysis.name,
         macros: analysis.macros,
         rating: analysis.rating,
-        recommendation: analysis.recommendation,
+        recommendation: fullRecommendation,
         imageUri: image || undefined,
         timestamp: initialEntry ? initialEntry.timestamp : Date.now()
       });
@@ -85,15 +91,15 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSave, onCancel, initia
          {image && (
            <div className="relative h-64 w-full bg-black rounded-2xl overflow-hidden shadow-lg group">
              <img src={image} alt="Food" className="w-full h-full object-cover" />
-             <div className="absolute top-4 right-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-sm font-bold shadow">
-               Оценка здоровья: <span className={analysis.rating >= 7 ? 'text-green-600' : 'text-orange-500'}>{analysis.rating}/10</span>
+             <div className="absolute top-4 right-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-sm font-bold shadow text-gray-900">
+               Оценка здоровья: <span className={analysis.rating >= 7 ? 'text-green-600' : analysis.rating >= 5 ? 'text-amber-500' : 'text-red-500'}>{analysis.rating}/10</span>
              </div>
              {/* Retake photo button */}
              <button 
                onClick={() => {
                  fileInputRef.current?.click();
                }}
-               className="absolute bottom-4 right-4 bg-black/50 text-white p-2 rounded-full backdrop-blur hover:bg-black/70 transition-colors"
+               className="absolute bottom-4 right-4 bg-black/70 text-white p-2 rounded-full backdrop-blur hover:bg-black/90 transition-colors"
              >
                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
              </button>
@@ -112,7 +118,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSave, onCancel, initia
 
          <Card>
             <div className="mb-4">
-              <label className="text-xs text-gray-500 uppercase font-bold">Название блюда</label>
+              <label className="text-xs text-gray-700 uppercase font-bold">Название блюда</label>
               <Input 
                 value={analysis.name} 
                 onChange={(e) => setAnalysis({...analysis, name: e.target.value})} 
@@ -122,7 +128,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSave, onCancel, initia
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                 <label className="text-xs text-gray-500 uppercase font-bold">Калории</label>
+                 <label className="text-xs text-gray-700 uppercase font-bold">Калории</label>
                  <Input 
                    type="number"
                    value={analysis.macros.calories}
@@ -130,7 +136,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSave, onCancel, initia
                  />
               </div>
               <div>
-                 <label className="text-xs text-gray-500 uppercase font-bold">Белки (г)</label>
+                 <label className="text-xs text-gray-700 uppercase font-bold">Белки (г)</label>
                  <Input 
                    type="number"
                    value={analysis.macros.protein}
@@ -138,7 +144,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSave, onCancel, initia
                  />
               </div>
               <div>
-                 <label className="text-xs text-gray-500 uppercase font-bold">Жиры (г)</label>
+                 <label className="text-xs text-gray-700 uppercase font-bold">Жиры (г)</label>
                  <Input 
                    type="number"
                    value={analysis.macros.fat}
@@ -146,7 +152,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSave, onCancel, initia
                  />
               </div>
               <div>
-                 <label className="text-xs text-gray-500 uppercase font-bold">Углеводы (г)</label>
+                 <label className="text-xs text-gray-700 uppercase font-bold">Углеводы (г)</label>
                  <Input 
                    type="number"
                    value={analysis.macros.carbs}
@@ -155,6 +161,19 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSave, onCancel, initia
               </div>
             </div>
          </Card>
+
+         {/* RATING EXPLANATION */}
+         {analysis.ratingDescription && (
+            <Card className={`${analysis.rating >= 7 ? 'bg-green-50 border-green-100' : analysis.rating >= 5 ? 'bg-amber-50 border-amber-100' : 'bg-red-50 border-red-100'}`}>
+               <h4 className={`font-bold mb-1 flex items-center gap-2 ${analysis.rating >= 7 ? 'text-green-800' : analysis.rating >= 5 ? 'text-amber-800' : 'text-red-800'}`}>
+                 <span className="text-xl">{analysis.rating >= 7 ? '👍' : analysis.rating >= 5 ? '⚖️' : '👎'}</span>
+                 Почему такая оценка?
+               </h4>
+               <p className={`text-sm leading-relaxed ${analysis.rating >= 7 ? 'text-green-900' : analysis.rating >= 5 ? 'text-amber-900' : 'text-red-900'}`}>
+                 {analysis.ratingDescription}
+               </p>
+            </Card>
+         )}
 
          <Card className="bg-blue-50 border-blue-100">
            <h4 className="font-bold text-blue-800 mb-1 flex items-center gap-2">
@@ -179,7 +198,7 @@ export const FoodLogger: React.FC<FoodLoggerProps> = ({ onSave, onCancel, initia
         <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
       </div>
       <h2 className="text-2xl font-bold text-gray-800">Что вы едите?</h2>
-      <p className="text-center text-gray-500 max-w-xs">Сфотографируйте еду. ИИ посчитает калории, макронутриенты и оценит полезность.</p>
+      <p className="text-center text-gray-600 max-w-xs">Сфотографируйте еду. ИИ посчитает калории, макронутриенты и оценит полезность.</p>
       
       <input 
         type="file" 
