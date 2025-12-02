@@ -258,31 +258,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
           </Card>
 
-          {/* Activity / Steps */}
-          <Card className="col-span-2 sm:col-span-1">
-            <div className="flex justify-between items-center mb-2">
-            <h3 className="font-bold text-gray-800 flex items-center gap-2 text-sm">
-                <div className="p-1.5 bg-red-100 rounded-lg">
-                <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" /></svg>
-                </div>
-                Шаги
-            </h3>
-            <span className="text-[10px] font-medium text-gray-600">{steps} / {profile.dailyStepGoal}</span>
-            </div>
-            <ProgressBar current={steps} max={profile.dailyStepGoal} color="bg-red-500" />
-            
-            <div className="mt-3 flex gap-2">
-                <button onClick={openActivity} className="flex-1 bg-orange-50 py-1.5 rounded-lg text-xs font-bold text-orange-600 hover:bg-orange-100 transition-colors flex items-center justify-center gap-1">
-                + Треня
-                </button>
-                <button onClick={syncSteps} className="flex-1 bg-gray-50 py-1.5 rounded-lg text-xs font-bold text-gray-600 hover:bg-gray-100 transition-colors flex items-center justify-center gap-1">
-                + Шаги
-                </button>
-            </div>
-          </Card>
-
-          {/* Sleep Summary Card */}
-          <Card className="col-span-2 bg-indigo-50 border-indigo-100">
+          {/* Sleep Summary Card (Moved Up) */}
+          <Card className="col-span-2 sm:col-span-1 bg-indigo-50 border-indigo-100">
              <div onClick={openSleepTracker} className="cursor-pointer">
                 <div className="flex justify-between items-center mb-2">
                     <div className="flex items-center gap-2">
@@ -315,6 +292,29 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     <span className="text-xs text-indigo-500 font-bold hover:underline">Управление сном →</span>
                 </div>
              </div>
+          </Card>
+
+          {/* Activity / Steps (Moved Down, Full Width) */}
+          <Card className="col-span-2">
+            <div className="flex justify-between items-center mb-2">
+            <h3 className="font-bold text-gray-800 flex items-center gap-2 text-sm">
+                <div className="p-1.5 bg-red-100 rounded-lg">
+                <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" /></svg>
+                </div>
+                Шаги и Активность
+            </h3>
+            <span className="text-[10px] font-medium text-gray-600">{steps} / {profile.dailyStepGoal}</span>
+            </div>
+            <ProgressBar current={steps} max={profile.dailyStepGoal} color="bg-red-500" />
+            
+            <div className="mt-3 flex gap-2">
+                <button onClick={openActivity} className="flex-1 bg-orange-50 py-3 rounded-xl text-sm font-bold text-orange-600 hover:bg-orange-100 transition-colors flex items-center justify-center gap-2 border border-orange-100">
+                <span>💪</span> Добавить тренировку
+                </button>
+                <button onClick={syncSteps} className="flex-1 bg-gray-50 py-3 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-100 transition-colors flex items-center justify-center gap-2 border border-gray-200">
+                <span>👟</span> Ввести шаги
+                </button>
+            </div>
           </Card>
       </div>
 
