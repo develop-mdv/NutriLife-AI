@@ -2,8 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { UserProfile, RoadmapStep, Achievement, MealRemindersConfig, SleepConfig, DailyStats } from '../types';
 import { Card, Button, LoadingSpinner, Input, ProgressBar, MarkdownText } from './UI';
-import { generateWellnessRoadmap } from '../services/geminiService';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 interface ProfileProps {
   profile: UserProfile;
@@ -22,6 +21,7 @@ interface ProfileProps {
   sleepConfig: SleepConfig;
   onUpdateSleepConfig: (config: SleepConfig) => void;
   history: DailyStats[];
+  performRoadmapGeneration: (wishes?: string) => Promise<void>;
 }
 
 interface ExtendedAchievement extends Achievement {
@@ -34,7 +34,7 @@ export const Profile: React.FC<ProfileProps> = ({
   profile, 
   onUpdateProfile, 
   roadmap, 
-  onUpdateRoadmap,
+  performRoadmapGeneration,
   mealReminders,
   onUpdateMealReminders,
   stats,
@@ -57,45 +57,21 @@ export const Profile: React.FC<ProfileProps> = ({
   // Achievement Modal State
   const [selectedAchievement, setSelectedAchievement] = useState<ExtendedAchievement | null>(null);
 
-  // Helper to load/generate roadmap and update goals
-  const performRoadmapGeneration = async (userWishes?: string) => {
-       setLoadingRoadmap(true);
-       setIsAdjustingPlan(false);
-       
-       const result = await generateWellnessRoadmap(profile, userWishes);
-       
-       if (result) {
-           // 1. Update Roadmap Steps
-           onUpdateRoadmap(result.steps);
-           
-           // 2. Apply Numeric Targets to Profile
-           if (result.targets) {
-              onUpdateProfile({
-                  ...profile,
-                  dailyCalorieGoal: result.targets.dailyCalories,
-                  dailyStepGoal: result.targets.dailySteps
-              });
-              setWaterGoal(result.targets.dailyWater);
-              onUpdateSleepConfig({
-                  ...sleepConfig,
-                  targetHours: result.targets.sleepHours
-              });
-           }
-       }
-       
-       setLoadingRoadmap(false);
-       setWishes(''); 
-  };
-
   // Initial load if empty
   useEffect(() => {
     if (activeTab === 'roadmap' && roadmap.length === 0 && !loadingRoadmap) {
-      performRoadmapGeneration();
+      setLoadingRoadmap(true);
+      performRoadmapGeneration().finally(() => setLoadingRoadmap(false));
     }
   }, [activeTab, roadmap.length]); 
 
   const handleAdjustPlan = () => {
-    performRoadmapGeneration(wishes);
+    setLoadingRoadmap(true);
+    setIsAdjustingPlan(false);
+    performRoadmapGeneration(wishes).finally(() => {
+        setLoadingRoadmap(false);
+        setWishes('');
+    });
   };
 
   const handleToggleReminder = (meal: keyof MealRemindersConfig) => {
@@ -294,12 +270,17 @@ export const Profile: React.FC<ProfileProps> = ({
              )}
           </div>
 
-          <div className="flex gap-4 mt-3 text-sm font-medium text-gray-600 bg-gray-50 w-fit px-3 py-1.5 rounded-xl">
+          <div 
+             onClick={() => setActiveTab('settings')}
+             className="flex gap-4 mt-3 text-sm font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 w-fit px-3 py-1.5 rounded-xl cursor-pointer transition-colors active:scale-95"
+             title="Нажмите для редактирования"
+          >
              <span>{profile.height} см</span>
              <span className="w-px h-4 bg-gray-300"></span>
              <span>{profile.weight} кг</span>
              <span className="w-px h-4 bg-gray-300"></span>
              <span>{profile.age} лет</span>
+             <svg className="w-4 h-4 text-gray-400 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
           </div>
         </div>
       </div>
@@ -461,10 +442,38 @@ export const Profile: React.FC<ProfileProps> = ({
                                   />
                                   <YAxis hide domain={[0, 'auto']} />
                                   <Tooltip 
-                                    cursor={{fill: '#F9FAFB'}} 
+                                    cursor={{fill: '#F9FAFB', radius: 4}} 
                                     contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)', padding: '12px'}}
                                   />
-                                  <Bar dataKey="calories" fill="#34D399" radius={[6, 6, 6, 6]} barSize={8} name="Калории" />
+                                  <Bar dataKey="calories" fill="#34D399" radius={[4, 4, 4, 4]} barSize={8} name="Калории" />
+                              </BarChart>
+                          </ResponsiveContainer>
+                      </div>
+                  </Card>
+
+                  <Card>
+                      <h4 className="text-sm font-bold text-gray-700 mb-6 flex items-center gap-2">
+                          <div className="w-2 h-4 rounded-full bg-red-500"></div>
+                          Динамика шагов
+                      </h4>
+                      <div className="h-48 text-xs">
+                          <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={filteredHistory}>
+                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
+                                  <XAxis 
+                                    dataKey="date" 
+                                    tickFormatter={(val) => new Date(val).getDate().toString()} 
+                                    tick={{fill: '#9CA3AF', fontSize: 10}} 
+                                    axisLine={false} 
+                                    tickLine={false}
+                                    dy={10}
+                                  />
+                                  <YAxis hide domain={[0, 'auto']} />
+                                  <Tooltip 
+                                    cursor={{fill: '#F9FAFB', radius: 4}} 
+                                    contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)', padding: '12px'}}
+                                  />
+                                  <Bar dataKey="steps" fill="#EF4444" radius={[4, 4, 4, 4]} barSize={8} name="Шаги" />
                               </BarChart>
                           </ResponsiveContainer>
                       </div>
@@ -679,7 +688,7 @@ export const Profile: React.FC<ProfileProps> = ({
                                     type="time" 
                                     value={mealReminders.breakfast.time}
                                     onChange={(e) => handleTimeChange('breakfast', e.target.value)}
-                                    className="bg-transparent text-xs text-gray-500 font-medium focus:outline-none focus:text-primary mt-0.5"
+                                    className="bg-white border border-gray-200 rounded px-2 py-0.5 text-xs text-gray-700 font-medium focus:outline-none focus:border-primary mt-1"
                                  />
                              </div>
                         </div>
@@ -704,7 +713,7 @@ export const Profile: React.FC<ProfileProps> = ({
                                     type="time" 
                                     value={mealReminders.lunch.time}
                                     onChange={(e) => handleTimeChange('lunch', e.target.value)}
-                                    className="bg-transparent text-xs text-gray-500 font-medium focus:outline-none focus:text-primary mt-0.5"
+                                    className="bg-white border border-gray-200 rounded px-2 py-0.5 text-xs text-gray-700 font-medium focus:outline-none focus:border-primary mt-1"
                                  />
                              </div>
                         </div>
@@ -729,7 +738,7 @@ export const Profile: React.FC<ProfileProps> = ({
                                     type="time" 
                                     value={mealReminders.dinner.time}
                                     onChange={(e) => handleTimeChange('dinner', e.target.value)}
-                                    className="bg-transparent text-xs text-gray-500 font-medium focus:outline-none focus:text-primary mt-0.5"
+                                    className="bg-white border border-gray-200 rounded px-2 py-0.5 text-xs text-gray-700 font-medium focus:outline-none focus:border-primary mt-1"
                                  />
                              </div>
                         </div>

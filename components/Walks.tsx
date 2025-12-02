@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Card, Button, LoadingSpinner, ProgressBar, Input } from './UI';
-import { suggestWalkingRoutes } from '../services/geminiService';
+import { suggestWalkingRoutes, validateAddress } from '../services/geminiService';
 import { WalkingRoute } from '../types';
 
 interface WalksProps {
@@ -19,10 +19,33 @@ export const Walks: React.FC<WalksProps> = ({ currentSteps, dailyGoal }) => {
   const [stepsNeeded, setStepsNeeded] = useState(0);
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
   const [customAddress, setCustomAddress] = useState('');
+  
+  // Address Verification State
+  const [addressVerified, setAddressVerified] = useState(false);
+  const [verifiedAddress, setVerifiedAddress] = useState<string | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
 
   useEffect(() => {
     setStepsNeeded(Math.max(0, dailyGoal - currentSteps));
   }, [currentSteps, dailyGoal]);
+
+  const handleVerifyAddress = async () => {
+      if (!customAddress.trim()) return;
+      setIsVerifying(true);
+      setVerifiedAddress(null);
+      setLocationError(null);
+      
+      const normalized = await validateAddress(customAddress);
+      
+      if (normalized) {
+          setVerifiedAddress(normalized);
+          setAddressVerified(true);
+      } else {
+          setLocationError("Не удалось найти такой адрес. Попробуйте уточнить.");
+          setAddressVerified(false);
+      }
+      setIsVerifying(false);
+  };
 
   const handleFindRoutes = () => {
     setLoading(true);
@@ -31,12 +54,12 @@ export const Walks: React.FC<WalksProps> = ({ currentSteps, dailyGoal }) => {
 
     // Check if we need geolocation for the selected mode
     if (activeTab === 'custom_address') {
-      if (!customAddress.trim()) {
-        setLocationError("Пожалуйста, введите адрес.");
+      if (!verifiedAddress) {
+        setLocationError("Сначала подтвердите адрес.");
         setLoading(false);
         return;
       }
-      fetchRoutes(null, null); // No GPS needed, address provided
+      fetchRoutes(null, null, verifiedAddress); 
       return;
     }
 
@@ -62,14 +85,14 @@ export const Walks: React.FC<WalksProps> = ({ currentSteps, dailyGoal }) => {
     );
   };
 
-  const fetchRoutes = async (lat: number | null, lng: number | null) => {
+  const fetchRoutes = async (lat: number | null, lng: number | null, addressOverride?: string) => {
     try {
       const fetchedRoutes = await suggestWalkingRoutes(
         lat,
         lng,
         stepsNeeded > 0 ? stepsNeeded : 3000,
         activeTab,
-        customAddress
+        addressOverride || customAddress
       );
       setRoutes(fetchedRoutes);
     } catch (error) {
@@ -83,8 +106,8 @@ export const Walks: React.FC<WalksProps> = ({ currentSteps, dailyGoal }) => {
   // Helper to build Yandex Maps Route Link
   const getYandexLink = (route: WalkingRoute) => {
     let startPoint = "";
-    if (activeTab === 'custom_address' && customAddress) {
-      startPoint = customAddress;
+    if (activeTab === 'custom_address' && verifiedAddress) {
+      startPoint = verifiedAddress;
     } else if (userLocation) {
       startPoint = `${userLocation.lat},${userLocation.lng}`;
     }
@@ -114,8 +137,8 @@ export const Walks: React.FC<WalksProps> = ({ currentSteps, dailyGoal }) => {
 
   const getGoogleLink = (route: WalkingRoute) => {
     let origin = "";
-    if (activeTab === 'custom_address' && customAddress) {
-       origin = customAddress;
+    if (activeTab === 'custom_address' && verifiedAddress) {
+       origin = verifiedAddress;
     } else if (userLocation) {
        origin = `${userLocation.lat},${userLocation.lng}`;
     }
@@ -139,6 +162,12 @@ export const Walks: React.FC<WalksProps> = ({ currentSteps, dailyGoal }) => {
     }
     return link;
   }
+
+  // Reset verification when changing tabs or typing new address
+  useEffect(() => {
+      setAddressVerified(false);
+      setVerifiedAddress(null);
+  }, [activeTab]);
 
   return (
     <div className="pb-24 space-y-6 animate-in fade-in duration-300">
@@ -189,12 +218,37 @@ export const Walks: React.FC<WalksProps> = ({ currentSteps, dailyGoal }) => {
       {/* Content based on Tab */}
       <div className="space-y-4">
          {activeTab === 'custom_address' && (
-             <Input 
-                placeholder="Введите адрес (дом, офис...)" 
-                value={customAddress}
-                onChange={(e) => setCustomAddress(e.target.value)}
-                className="bg-white"
-             />
+             <div className="space-y-2">
+                 <div className="flex gap-2">
+                     <Input 
+                        placeholder="Введите адрес (дом, офис...)" 
+                        value={customAddress}
+                        onChange={(e) => {
+                            setCustomAddress(e.target.value);
+                            setAddressVerified(false);
+                        }}
+                        className="bg-white"
+                     />
+                     <Button 
+                        onClick={handleVerifyAddress} 
+                        variant="secondary"
+                        disabled={isVerifying || !customAddress}
+                        className="px-4"
+                     >
+                         {isVerifying ? <LoadingSpinner /> : 'Проверить'}
+                     </Button>
+                 </div>
+                 
+                 {verifiedAddress && (
+                     <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100 text-sm flex items-start gap-2 animate-in slide-in-from-top-1">
+                         <span className="text-emerald-600 mt-0.5">✓</span>
+                         <div>
+                             <span className="text-gray-500 text-xs block">Адрес найден:</span>
+                             <span className="font-bold text-gray-800">{verifiedAddress}</span>
+                         </div>
+                     </div>
+                 )}
+             </div>
          )}
 
          {activeTab === 'nearby' && (
@@ -209,7 +263,11 @@ export const Walks: React.FC<WalksProps> = ({ currentSteps, dailyGoal }) => {
              </p>
          )}
 
-         <Button onClick={handleFindRoutes} disabled={loading} className="w-full shadow-emerald-200">
+         <Button 
+            onClick={handleFindRoutes} 
+            disabled={loading || (activeTab === 'custom_address' && !addressVerified)} 
+            className="w-full shadow-emerald-200"
+         >
             {loading ? 'Строю маршруты...' : 'Подобрать прогулку'}
          </Button>
 

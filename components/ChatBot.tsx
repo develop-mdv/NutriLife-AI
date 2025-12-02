@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Button, Card, Input, LoadingSpinner, MarkdownText } from './UI';
 import { sendChatMessage, LiveClient } from '../services/geminiService';
@@ -20,6 +21,7 @@ interface ChatBotProps {
   sleepData?: SleepEntry;
   sleepConfig?: SleepConfig;
   onSetAlarm?: (time: string) => void;
+  onUpdateRoadmap?: (wishes: string) => Promise<void>;
 }
 
 export const ChatBot: React.FC<ChatBotProps> = ({ 
@@ -30,7 +32,8 @@ export const ChatBot: React.FC<ChatBotProps> = ({
   activityCalories,
   sleepData,
   sleepConfig,
-  onSetAlarm
+  onSetAlarm,
+  onUpdateRoadmap
 }) => {
   const [mode, setMode] = useState<'text' | 'live'>('text');
   const [messages, setMessages] = useState<Message[]>([
@@ -40,6 +43,7 @@ export const ChatBot: React.FC<ChatBotProps> = ({
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [location, setLocation] = useState<{lat: number, lng: number} | undefined>();
+  const [updatingPlan, setUpdatingPlan] = useState(false);
   
   // Live Client Ref
   const liveClientRef = useRef<LiveClient | null>(null);
@@ -47,7 +51,7 @@ export const ChatBot: React.FC<ChatBotProps> = ({
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading]);
+  }, [messages, loading, updatingPlan]);
 
   // Request Location on mount
   useEffect(() => {
@@ -151,10 +155,48 @@ export const ChatBot: React.FC<ChatBotProps> = ({
     const context = getUserContext();
     const response = await sendChatMessage(history, userMsg.text, location, context);
     
+    // Check for Plan Update Tag
+    const updateMatch = response.text.match(/\[UPDATE_PLAN:\s*(.*?)\]/);
+    let displayText = response.text;
+    
+    if (updateMatch && onUpdateRoadmap) {
+        const updateDescription = updateMatch[1];
+        // Remove the tag from display text
+        displayText = displayText.replace(updateMatch[0], "").trim();
+        
+        setMessages(prev => [...prev, { 
+            id: (Date.now() + 1).toString(), 
+            role: 'model', 
+            text: displayText, 
+            groundingChunks: response.groundingChunks 
+        }]);
+        setLoading(false);
+
+        // Trigger update
+        setUpdatingPlan(true);
+        try {
+            await onUpdateRoadmap(updateDescription);
+            setMessages(prev => [...prev, {
+                id: (Date.now() + 2).toString(),
+                role: 'model',
+                text: "**✅ План успешно обновлен!** Зайдите в профиль, чтобы увидеть новую стратегию."
+            }]);
+        } catch (e) {
+            setMessages(prev => [...prev, {
+                id: (Date.now() + 2).toString(),
+                role: 'model',
+                text: "❌ Не удалось обновить план. Попробуйте еще раз."
+            }]);
+        } finally {
+            setUpdatingPlan(false);
+        }
+        return;
+    }
+    
     setMessages(prev => [...prev, { 
         id: (Date.now() + 1).toString(), 
         role: 'model', 
-        text: response.text, 
+        text: displayText, 
         groundingChunks: response.groundingChunks 
     }]);
     setLoading(false);
@@ -265,6 +307,15 @@ export const ChatBot: React.FC<ChatBotProps> = ({
                 </div>
               </div>
             )}
+            
+            {updatingPlan && (
+                <div className="flex justify-center p-4">
+                    <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-6 py-3 rounded-full flex items-center gap-3 shadow-lg animate-pulse">
+                        <LoadingSpinner /> 
+                        <span className="font-bold text-sm">Обновляю ваш план...</span>
+                    </div>
+                </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
 
@@ -275,8 +326,9 @@ export const ChatBot: React.FC<ChatBotProps> = ({
               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
               placeholder="Сообщение..." 
               className="flex-1 shadow-sm border-0 focus:ring-0"
+              disabled={updatingPlan}
             />
-            <Button onClick={handleSend} className="w-12 h-12 !p-0 rounded-full !min-w-0 flex items-center justify-center shrink-0">
+            <Button onClick={handleSend} disabled={updatingPlan} className="w-12 h-12 !p-0 rounded-full !min-w-0 flex items-center justify-center shrink-0">
               <svg className="w-5 h-5 translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7" /></svg>
             </Button>
           </div>

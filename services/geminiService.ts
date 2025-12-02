@@ -100,7 +100,14 @@ export const sendChatMessage = async (
     // Switch to gemini-2.5-flash if tools are needed for better grounding support and speed
     const model = (needsSearch || needsMaps) ? "gemini-2.5-flash" : "gemini-3-pro-preview";
 
-    const systemInstruction = "Ты полезный и мотивирующий тренер по питанию, сну и фитнесу. Отвечай кратко и на русском языке. Если используешь поиск или карты, используй эту информацию для ответа. Если пользователь просит поставить будильник, подтверди, что ты обновил настройки (но само действие выполняется приложением)." + (context ? `\n\nКонтекст пользователя и история:\n${context}` : "");
+    let systemInstruction = "Ты полезный и мотивирующий тренер по питанию, сну и фитнесу. Отвечай кратко и на русском языке. Если используешь поиск или карты, используй эту информацию для ответа. Если пользователь просит поставить будильник, подтверди, что ты обновил настройки (но само действие выполняется приложением).";
+    
+    // Add command instruction for roadmap updates
+    systemInstruction += "\n\nЕсли пользователь просит изменить план или стратегию (roadmap) и ты согласен с изменениями, в конце своего ответа добавь специальный тег: [UPDATE_PLAN: описание изменений]. Приложение увидит этот тег и обновит план.";
+    
+    if (context) {
+        systemInstruction += `\n\nКонтекст пользователя и история:\n${context}`;
+    }
 
     const chat = ai.chats.create({
       model: model,
@@ -203,6 +210,23 @@ export const generateWellnessRoadmap = async (userProfile: any, wishes?: string)
     console.error("Roadmap generation failed", error);
     return null;
   }
+}
+
+// --- Address Validation ---
+export const validateAddress = async (input: string): Promise<string | null> => {
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: `Исправь и нормализуй этот адрес (на русском). Если это не адрес, верни NULL.
+            Ввод: "${input}"
+            Верни ТОЛЬКО полный корректный адрес одной строкой без кавычек.`
+        });
+        const text = response.text?.trim();
+        if (!text || text === "NULL") return null;
+        return text;
+    } catch (e) {
+        return null;
+    }
 }
 
 // --- Walking Routes Generation ---

@@ -9,6 +9,7 @@ import { Walks } from './components/Walks';
 import { SleepTracker } from './components/SleepTracker';
 import { AppView, FoodEntry, UserProfile, Macros, ActivityEntry, RoadmapStep, MealRemindersConfig, ReminderConfig, SleepConfig, SleepEntry, DailyStats } from './types';
 import { Button, Input } from './components/UI';
+import { generateWellnessRoadmap } from './services/geminiService';
 
 // Mock Data
 const INITIAL_PROFILE: UserProfile = {
@@ -66,6 +67,28 @@ const App: React.FC = () => {
   const [mealReminders, setMealReminders] = useState<MealRemindersConfig>(INITIAL_MEAL_REMINDERS);
   const lastNotifiedMinute = useRef<string | null>(null);
   const lastSleepNotifiedMinute = useRef<string | null>(null);
+
+  // Roadmap Generation Handler (Lifted from Profile)
+  const handleGenerateRoadmap = async (wishes?: string) => {
+       const result = await generateWellnessRoadmap(profile, wishes);
+       if (result) {
+           // 1. Update Roadmap Steps
+           setRoadmap(result.steps);
+           // 2. Apply Numeric Targets to Profile
+           if (result.targets) {
+              setProfile(prev => ({
+                  ...prev,
+                  dailyCalorieGoal: result.targets.dailyCalories,
+                  dailyStepGoal: result.targets.dailySteps
+              }));
+              setWaterGoal(result.targets.dailyWater);
+              setSleepConfig(prev => ({
+                  ...prev,
+                  targetHours: result.targets.sleepHours
+              }));
+           }
+       }
+  };
 
   // Mock History Data Generation (Memoized to prevent regeneration on render)
   const historyData: DailyStats[] = useMemo(() => {
@@ -323,6 +346,7 @@ const App: React.FC = () => {
             sleepData={lastSleepEntry}
             sleepConfig={sleepConfig}
             onSetAlarm={(time) => setSleepConfig({...sleepConfig, wakeTime: time, wakeAlarmEnabled: true})}
+            onUpdateRoadmap={handleGenerateRoadmap}
           />
         );
       case AppView.PROFILE:
@@ -344,6 +368,7 @@ const App: React.FC = () => {
             sleepConfig={sleepConfig}
             onUpdateSleepConfig={setSleepConfig}
             history={fullHistory}
+            performRoadmapGeneration={handleGenerateRoadmap}
           />
         );
       case AppView.WALKS:
@@ -361,6 +386,7 @@ const App: React.FC = () => {
               onUpdateConfig={setSleepConfig}
               onClose={() => setView(AppView.DASHBOARD)}
               entries={sleepEntries}
+              onOpenChat={() => setView(AppView.CHAT)}
            />
         );
       default:

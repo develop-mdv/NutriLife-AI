@@ -9,6 +9,7 @@ interface SleepTrackerProps {
   onUpdateConfig: (config: SleepConfig) => void;
   onClose: () => void;
   entries: SleepEntry[];
+  onOpenChat: () => void;
 }
 
 export const SleepTracker: React.FC<SleepTrackerProps> = ({ 
@@ -16,7 +17,8 @@ export const SleepTracker: React.FC<SleepTrackerProps> = ({
   config, 
   onUpdateConfig, 
   onClose,
-  entries 
+  entries,
+  onOpenChat
 }) => {
   const [activeTab, setActiveTab] = useState<'log' | 'settings' | 'tips'>('log');
   
@@ -253,8 +255,11 @@ export const SleepTracker: React.FC<SleepTrackerProps> = ({
                       <p className="text-gray-600 text-sm leading-relaxed">{tip.text}</p>
                   </div>
               ))}
-              <div className="text-center p-4 bg-indigo-50 rounded-2xl border border-indigo-100 text-indigo-800 text-sm font-medium">
-                  Спросите нашего ИИ-тренера о персональных советах по сну! 💬
+              <div 
+                onClick={onOpenChat}
+                className="text-center p-4 bg-indigo-50 rounded-2xl border border-indigo-100 text-indigo-800 text-sm font-medium cursor-pointer hover:bg-indigo-100 transition-colors"
+              >
+                  💬 Спросите нашего ИИ-тренера о персональных советах по сну!
               </div>
           </div>
       )}
