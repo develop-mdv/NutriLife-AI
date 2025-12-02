@@ -290,6 +290,7 @@ const App: React.FC = () => {
             openActivity={() => setView(AppView.ACTIVITY)}
             openSleepTracker={() => setView(AppView.SLEEP)}
             syncSteps={openSyncSteps}
+            openProfile={() => setView(AppView.PROFILE)}
             onEditFood={handleEditFood}
             onAddWater={(amount) => setWaterIntake(prev => prev + amount)}
             onToggleReminders={toggleReminders}

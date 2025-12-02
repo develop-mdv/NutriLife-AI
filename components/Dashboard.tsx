@@ -19,6 +19,7 @@ interface DashboardProps {
   openActivity: () => void;
   openSleepTracker: () => void;
   syncSteps: () => void;
+  openProfile: () => void;
   onEditFood: (entry: FoodEntry) => void;
   onAddWater: (amount: number) => void;
   onToggleReminders: () => void;
@@ -39,6 +40,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   openActivity, 
   openSleepTracker,
   syncSteps,
+  openProfile,
   onEditFood,
   onAddWater,
   onToggleReminders
@@ -144,7 +146,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <h1 className="text-2xl font-bold text-gray-900">Привет, {profile.name} 👋</h1>
           <p className="text-gray-500 text-sm">Давай достигнем целей сегодня!</p>
         </div>
-        <div className="h-10 w-10 bg-gray-200 rounded-full overflow-hidden border-2 border-white shadow-sm">
+        <div 
+          onClick={openProfile}
+          className="h-10 w-10 bg-gray-200 rounded-full overflow-hidden border-2 border-white shadow-sm cursor-pointer transition-transform active:scale-95 hover:shadow-md"
+        >
            <img src={`https://ui-avatars.com/api/?name=${profile.name}&background=random`} alt="Avatar" />
         </div>
       </div>
@@ -307,12 +312,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
             <ProgressBar current={steps} max={profile.dailyStepGoal} color="bg-red-500" />
             
-            <div className="mt-3 flex gap-2">
-                <button onClick={openActivity} className="flex-1 bg-orange-50 py-3 rounded-xl text-sm font-bold text-orange-600 hover:bg-orange-100 transition-colors flex items-center justify-center gap-2 border border-orange-100">
-                <span>💪</span> Добавить тренировку
+            <div className="mt-4 flex gap-3">
+                <button onClick={openActivity} className="flex-[1.2] bg-gradient-to-tr from-orange-500 to-red-500 text-white py-3.5 rounded-2xl shadow-lg shadow-orange-200 hover:shadow-orange-300 hover:-translate-y-0.5 active:scale-95 transition-all flex items-center justify-center gap-2 font-bold text-sm tracking-wide">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                    Добавить тренировку
                 </button>
-                <button onClick={syncSteps} className="flex-1 bg-gray-50 py-3 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-100 transition-colors flex items-center justify-center gap-2 border border-gray-200">
-                <span>👟</span> Ввести шаги
+                <button onClick={syncSteps} className="flex-1 bg-white border-2 border-gray-100 text-gray-600 py-3.5 rounded-2xl hover:bg-gray-50 hover:border-gray-200 hover:text-gray-800 active:scale-95 transition-all flex items-center justify-center gap-2 font-bold text-sm">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                    Синхронизация
                 </button>
             </div>
           </Card>
