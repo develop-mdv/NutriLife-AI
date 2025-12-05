@@ -26,7 +26,7 @@ aiRouter.post('/chat', async (req: AuthedRequest, res) => {
     if (needsSearch) tools.push({ googleSearch: {} });
     if (needsMaps) tools.push({ googleMaps: {} });
 
-    const model = needsSearch || needsMaps ? 'gemini-2.5-flash' : 'gemini-3-pro-preview';
+    const model = 'gemini-2.5-flash';
 
     let systemInstruction =
       'Ты полезный и мотивирующий тренер по питанию, сну и фитнесу. Отвечай кратко и на русском языке. ' +
@@ -73,7 +73,7 @@ aiRouter.post('/analyze-food', async (req: AuthedRequest, res) => {
     if (!image) return res.status(400).json({ error: 'image (base64) обязателен' });
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
+      model: 'gemini-2.5-flash',
       contents: {
         parts: [
           {
