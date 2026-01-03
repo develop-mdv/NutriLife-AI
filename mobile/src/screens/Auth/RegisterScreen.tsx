@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, StyleSheet, ActivityIndicator } from 'react-native';
+import { AppButton } from '../../components/AppButton';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/RootNavigator';
 import { useAuth } from '../../context/AuthContext';
@@ -55,10 +56,10 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
       {loading ? (
         <ActivityIndicator />
       ) : (
-        <Button title="Создать аккаунт" onPress={onSubmit} />
+        <AppButton title="Создать аккаунт" onPress={onSubmit} />
       )}
       <View style={{ height: 16 }} />
-      <Button title="У меня уже есть аккаунт" onPress={() => navigation.navigate('Login')} />
+      <AppButton title="У меня уже есть аккаунт" onPress={() => navigation.navigate('Login')} />
     </View>
   );
 };

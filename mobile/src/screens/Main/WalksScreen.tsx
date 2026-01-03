@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Button, ScrollView, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Linking } from 'react-native';
+import { AppButton } from '../../components/AppButton';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { useTodayStats } from '../../hooks/useTodayStats';
 
@@ -81,7 +83,8 @@ export const WalksScreen: React.FC = () => {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 24 }}>
+    <SafeAreaView style={styles.safeContainer} edges={['top']}>
+      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 24 }}>
       <Text style={styles.title}>Прогулки</Text>
       <Text style={styles.subtitle}>
         Сегодня вы прошли {today.steps} шагов. Цель — {stepsGoal}. Осталось примерно {remainingSteps} шагов
@@ -102,18 +105,23 @@ export const WalksScreen: React.FC = () => {
           </Text>
           <Text style={styles.description}>{route.description}</Text>
           <View style={styles.row}>
-            <Button title="Открыть в Яндекс.Картах" onPress={() => openYandex(route.query)} />
+            <AppButton title="Открыть в Яндекс.Картах" onPress={() => openYandex(route.query)} />
           </View>
           <View style={styles.row}>
-            <Button title="Открыть в Google Maps" onPress={() => openGoogle(route.query)} />
+            <AppButton title="Открыть в Google Maps" onPress={() => openGoogle(route.query)} />
           </View>
         </View>
       ))}
     </ScrollView>
+  </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeContainer: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+  },
   container: {
     flex: 1,
     padding: 16,

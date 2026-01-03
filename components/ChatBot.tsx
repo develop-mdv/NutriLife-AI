@@ -81,8 +81,9 @@ export const ChatBot: React.FC<ChatBotProps> = ({
   // Helper to generate context string
   const getUserContext = () => {
     if (!userProfile) return "";
-    let context = `Данные пользователя:\n`;
-    context += `Имя: ${userProfile.name}, Возраст: ${userProfile.age}, Рост: ${userProfile.height}, Вес: ${userProfile.weight}, Цель: ${userProfile.goal === 'lose_weight' ? 'Похудение' : userProfile.goal === 'gain_muscle' ? 'Набор массы' : 'Поддержание'}.\n`;
+    let context = `Данные пользователя:\\n`;
+    const genderRu = userProfile.gender === 'male' ? 'мужской' : userProfile.gender === 'female' ? 'женский' : 'другой';
+    context += `Имя: ${userProfile.name}, Возраст: ${userProfile.age}, Пол: ${genderRu}, Рост: ${userProfile.height}, Вес: ${userProfile.weight}, Цель: ${userProfile.goal === 'lose_weight' ? 'Похудение' : userProfile.goal === 'gain_muscle' ? 'Набор массы' : 'Поддержание'}.\\n`;
     
     if (userProfile.allergies) context += `Аллергии: ${userProfile.allergies}\n`;
     if (userProfile.preferences) context += `Предпочтения: ${userProfile.preferences}\n`;

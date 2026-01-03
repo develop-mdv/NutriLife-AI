@@ -1,46 +1,94 @@
-import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Button, ActivityIndicator, ScrollView, Image, TouchableOpacity } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, ActivityIndicator, ScrollView, Image, TouchableOpacity } from 'react-native';
+import { AppButton } from '../../components/AppButton';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Svg, { Circle } from 'react-native-svg';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSteps } from '../../hooks/useSteps';
 import { useTodayStats } from '../../hooks/useTodayStats';
-import { useNotificationsSetup, scheduleWaterReminder } from '../../hooks/useNotifications';
+import { useNotificationsSetup, scheduleWaterReminder, cancelWaterReminders } from '../../hooks/useNotifications';
 import { useFoodToday } from '../../hooks/useFoodToday';
 import { MainStackParamList } from '../../navigation/MainStack';
 import { useAuth } from '../../context/AuthContext';
-import { useHistoryStats } from '../../hooks/useHistoryStats';
+import { getProfile, getSettings, SettingsApi, UserProfileApi, updateStepsToday } from '../../api/me';
 
 type Nav = NativeStackNavigationProp<MainStackParamList, 'Tabs'>;
 
-type Period = 'today' | '7d' | '30d';
-
 type FoodFilterType = 'today' | 'week' | 'custom';
+
+const ProgressBar: React.FC<{ current: number; max: number; color: string }> = ({ current, max, color }) => {
+  const ratio = max > 0 ? Math.min(current / max, 1) : 0;
+  return (
+    <View style={styles.progressOuter}>
+      <View style={[styles.progressInner, { width: `${ratio * 100}%`, backgroundColor: color }]} />
+    </View>
+  );
+};
 
 export const DashboardScreen: React.FC = () => {
   useNotificationsSetup();
   const navigation = useNavigation<Nav>();
   const { user } = useAuth();
   const { steps } = useSteps(true);
-  const { stats, loading, addWater } = useTodayStats();
+  const { stats, loading, addWater, setStats } = useTodayStats();
   const { items: foodItems, loading: foodLoading, load: loadFood } = useFoodToday();
-  const { summary, loading: historyLoading } = useHistoryStats();
-  const [period, setPeriod] = useState<Period>('today');
   const [foodFilterType, setFoodFilterType] = useState<FoodFilterType>('today');
   const [foodDateRange, setFoodDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
   const [expandedFoodId, setExpandedFoodId] = useState<string | null>(null);
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
+  const [profile, setProfile] = useState<UserProfileApi | null>(null);
+  const [settings, setSettings] = useState<SettingsApi | null>(null);
+  const [showConsumed, setShowConsumed] = useState(false);
+  const [waterRemindersEnabled, setWaterRemindersEnabled] = useState(false);
+
+  const loadProfileAndSettings = React.useCallback(async () => {
+    try {
+      const [p, s, waterFlag] = await Promise.all([
+        getProfile(),
+        getSettings(),
+        AsyncStorage.getItem('waterRemindersEnabled'),
+      ]);
+      setProfile(p.data);
+      setSettings(s.data);
+      if (waterFlag === 'true') setWaterRemindersEnabled(true);
+    } catch (e) {
+      console.log('Ошибка загрузки профиля/настроек для Dashboard', e);
+    }
+  }, []);
 
   useFocusEffect(
     React.useCallback(() => {
       loadFood();
-    }, [loadFood]),
+      loadProfileAndSettings();
+    }, [loadFood, loadProfileAndSettings]),
   );
 
+  useEffect(() => {
+    loadProfileAndSettings();
+  }, [loadProfileAndSettings]);
+
   const onEnableWaterReminders = async () => {
-    await scheduleWaterReminder(120); // каждые 2 часа
+    await scheduleWaterReminder(120); // legacy helper, оставлен для совместимости, но основное управление через onToggleWaterReminders
+  };
+
+  const onToggleWaterReminders = async () => {
+    try {
+      const next = !waterRemindersEnabled;
+      if (next) {
+        await scheduleWaterReminder(120);
+      } else {
+        await cancelWaterReminders();
+      }
+      setWaterRemindersEnabled(next);
+      await AsyncStorage.setItem('waterRemindersEnabled', next ? 'true' : 'false');
+    } catch (e) {
+      console.log('Ошибка переключения напоминаний воды', e);
+    }
   };
 
   // агрегированные макросы за сегодня (считаем по временной метке)
@@ -58,6 +106,28 @@ export const DashboardScreen: React.FC = () => {
   const totalFat = todayFoodItems.reduce((sum, f) => sum + (f.fat || 0), 0);
   const totalCarbs = todayFoodItems.reduce((sum, f) => sum + (f.carbs || 0), 0);
   const totalCaloriesFromFood = todayFoodItems.reduce((sum, f) => sum + (f.calories || 0), 0);
+
+  const calorieGoal = profile?.dailyCalorieGoal || 2000;
+  const caloriesConsumedToday = Math.round(stats.calories || totalCaloriesFromFood);
+  const burnedCalories = 0; // TODO: когда появятся тренировки/активность, можно учесть сожжённые калории
+  const caloriesLeftToday = Math.max(0, calorieGoal - caloriesConsumedToday + burnedCalories);
+
+  const macroGoals = useMemo(() => {
+    const cals = calorieGoal;
+    let ratio = { p: 0.25, f: 0.25, c: 0.5 } as const;
+
+    if (profile?.goal === 'lose_weight') {
+      ratio = { p: 0.4, f: 0.3, c: 0.3 } as const;
+    } else if (profile?.goal === 'gain_muscle') {
+      ratio = { p: 0.3, f: 0.2, c: 0.5 } as const;
+    }
+
+    return {
+      protein: Math.round((cals * ratio.p) / 4),
+      fat: Math.round((cals * ratio.f) / 9),
+      carbs: Math.round((cals * ratio.c) / 4),
+    };
+  }, [calorieGoal, profile?.goal]);
 
   // фильтрация истории питания по периоду (Сегодня / 7 дней / Период)
   const filteredFoodEntries = useMemo(() => {
@@ -97,28 +167,22 @@ export const DashboardScreen: React.FC = () => {
       .sort((a, b) => b.timestamp - a.timestamp);
   }, [foodItems, foodFilterType, foodDateRange, todayStart]);
 
-  // калории по выбранному периоду для диаграммы
-  const calorieGoal = 2000;
-  let caloriesForPeriod = stats.calories;
-  let periodTitle = 'Калории сегодня';
-  let periodSubtitle = 'Сумма калорий за сегодня';
-
-  if (period === '7d') {
-    caloriesForPeriod = summary.last7.avgCalories;
-    periodTitle = 'Средние калории (7 дней)';
-    periodSubtitle = 'Средняя дневная норма за последние 7 дней';
-  } else if (period === '30d') {
-    caloriesForPeriod = summary.last30.avgCalories;
-    periodTitle = 'Средние калории (30 дней)';
-    periodSubtitle = 'Средняя дневная норма за последние 30 дней';
-  }
-
-  const progress = Math.min(caloriesForPeriod / calorieGoal, 1);
+  // кольцо калорий: прогресс по сегодняшним калориям относительно цели профиля
   const RING_SIZE = 140;
   const STROKE_WIDTH = 14;
   const radius = (RING_SIZE - STROKE_WIDTH) / 2;
   const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - circumference * progress;
+  const ringProgress = calorieGoal > 0 ? Math.min(caloriesConsumedToday / calorieGoal, 1) : 0;
+  const strokeDashoffset = circumference - circumference * ringProgress;
+
+  const onSyncSteps = async () => {
+    try {
+      await updateStepsToday(steps);
+      setStats((prev) => ({ ...prev, steps }));
+    } catch (e) {
+      console.log('Ошибка синхронизации шагов', e);
+    }
+  };
 
   if (loading) {
     return (
@@ -129,52 +193,38 @@ export const DashboardScreen: React.FC = () => {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 24 }}>
+    <SafeAreaView style={styles.safeContainer} edges={['top']}>
+      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 24 }}>
       {/* Header, как в веб-версии */}
       <View style={styles.headerRow}>
         <View>
           <Text style={styles.greeting}>Привет, {user?.name || 'друг'} 👋</Text>
           <Text style={styles.greetingSub}>Давай достигнем целей сегодня!</Text>
         </View>
-        <View style={styles.avatarCircle}>
+        <TouchableOpacity
+          style={styles.avatarCircle}
+          activeOpacity={0.8}
+          onPress={() => (navigation as any).navigate('Profile')}
+        >
           <Text style={styles.avatarText}>
             {(user?.name || 'N')[0]?.toUpperCase()}
           </Text>
-        </View>
+        </TouchableOpacity>
       </View>
 
-      {/* Калории, фильтры периода и диаграмма */}
+      {/* Кольцо калорий и макросы как на веб-дашборде */}
       <View style={styles.cardEmphasis}>
         <View style={styles.cardHeaderRow}>
-          <Text style={styles.cardTitle}>{periodTitle}</Text>
-          <View style={styles.filterRow}>
-            {(
-              [
-                { key: 'today', label: 'Сегодня' },
-                { key: '7d', label: '7 дней' },
-                { key: '30d', label: '30 дней' },
-              ] as { key: Period; label: string }[]
-            ).map((p) => (
-              <TouchableOpacity
-                key={p.key}
-                style={[styles.filterChip, period === p.key && styles.filterChipActive]}
-                onPress={() => setPeriod(p.key)}
-              >
-                <Text
-                  style={[
-                    styles.filterChipText,
-                    period === p.key && styles.filterChipTextActive,
-                  ]}
-                >
-                  {p.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <Text style={styles.cardTitle}>Сегодня</Text>
+          <Text style={styles.smallText}>Цель: {calorieGoal} ккал</Text>
         </View>
 
         <View style={styles.ringAndTextRow}>
-          <View style={styles.ringWrapper}>
+          <TouchableOpacity
+            style={styles.ringWrapper}
+            activeOpacity={0.8}
+            onPress={() => setShowConsumed((prev) => !prev)}
+          >
             <Svg width={RING_SIZE} height={RING_SIZE}>
               <Circle
                 cx={RING_SIZE / 2}
@@ -200,37 +250,46 @@ export const DashboardScreen: React.FC = () => {
               />
             </Svg>
             <View style={styles.ringInner}>
-              {historyLoading && period !== 'today' ? (
-                <ActivityIndicator />
-              ) : (
-                <>
-                  <Text style={styles.ringCalories}>{caloriesForPeriod}</Text>
-                  <Text style={styles.ringLabel}>из {calorieGoal} ккал</Text>
-                </>
+              <Text style={styles.ringCalories}>
+                {showConsumed ? caloriesConsumedToday : caloriesLeftToday}
+              </Text>
+              <Text style={styles.ringLabel}>
+                {showConsumed ? 'ккал съедено' : 'ккал ост.'}
+              </Text>
+              {showConsumed && (
+                <Text style={styles.ringLabelSmall}>из {calorieGoal} ккал</Text>
+              )}
+              {!showConsumed && burnedCalories > 0 && (
+                <Text style={styles.ringBurned}>+{burnedCalories} сожжено</Text>
               )}
             </View>
-          </View>
-          <View style={styles.ringSideText}>
-            <Text style={styles.ringSideTitle}>{periodTitle}</Text>
-            <Text style={styles.ringSideSubtitle}>{periodSubtitle}</Text>
-          </View>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.macrosRow}>
           <View style={styles.macroCol}>
             <Text style={[styles.macroDot, { backgroundColor: '#34D399' }]} />
             <Text style={styles.macroLabel}>Белки</Text>
-            <Text style={styles.macroValue}>{Math.round(totalProtein)} г</Text>
+            <Text style={styles.macroValue}>
+              {Math.round(totalProtein)} г
+              <Text style={styles.macroGoalText}> / {macroGoals.protein} г</Text>
+            </Text>
           </View>
           <View style={styles.macroCol}>
             <Text style={[styles.macroDot, { backgroundColor: '#FBBF24' }]} />
             <Text style={styles.macroLabel}>Жиры</Text>
-            <Text style={styles.macroValue}>{Math.round(totalFat)} г</Text>
+            <Text style={styles.macroValue}>
+              {Math.round(totalFat)} г
+              <Text style={styles.macroGoalText}> / {macroGoals.fat} г</Text>
+            </Text>
           </View>
           <View style={styles.macroCol}>
             <Text style={[styles.macroDot, { backgroundColor: '#60A5FA' }]} />
             <Text style={styles.macroLabel}>Углеводы</Text>
-            <Text style={styles.macroValue}>{Math.round(totalCarbs)} г</Text>
+            <Text style={styles.macroValue}>
+              {Math.round(totalCarbs)} г
+              <Text style={styles.macroGoalText}> / {macroGoals.carbs} г</Text>
+            </Text>
           </View>
         </View>
 
@@ -242,37 +301,150 @@ export const DashboardScreen: React.FC = () => {
       {/* Вода и сон в одну строку, как две карточки */}
       <View style={styles.rowBetween}>
         <View style={[styles.cardSmall, { flex: 1, marginRight: 8 }] }>
-          <Text style={styles.cardTitle}>Вода</Text>
-          <Text style={styles.value}>{stats.water} мл</Text>
+          <View style={styles.cardHeaderRowAlt}>
+            <View style={styles.cardTitleRowLeft}>
+              <View style={[styles.iconCircle, styles.iconWater]}>
+                <Text style={styles.iconEmoji}>💧</Text>
+              </View>
+              <View style={styles.cardTitleTextContainer}>
+                <Text style={styles.cardTitleSmall} numberOfLines={1} ellipsizeMode="tail">
+                  Вода
+                </Text>
+                <Text
+                  style={styles.cardSubtitleSmall}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {stats.water} / {(settings?.waterGoal ?? 2000)} мл
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity onPress={onToggleWaterReminders} activeOpacity={0.7}>
+              <Text
+                style={[
+                  styles.cardBell,
+                  waterRemindersEnabled && styles.cardBellActive,
+                ]}
+              >
+                🔔
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <ProgressBar
+            current={stats.water}
+            max={settings?.waterGoal ?? 2000}
+            color="#06B6D4"
+          />
           <View style={styles.row}>
-            <Button title="+250" onPress={() => addWater(250)} />
-            <Button title="+500" onPress={() => addWater(500)} />
+            <AppButton title="+250" onPress={() => addWater(250)} />
+            <View style={{ width: 8 }} />
+            <AppButton title="+500" onPress={() => addWater(500)} />
           </View>
           <View style={{ marginTop: 8 }}>
-            <Button title="Напоминания" onPress={onEnableWaterReminders} />
+            <AppButton title="Напоминания" onPress={onEnableWaterReminders} />
           </View>
         </View>
 
         <View style={[styles.cardSmall, { flex: 1, marginLeft: 8 }] }>
-          <Text style={styles.cardTitle}>Сон</Text>
-          <Text style={styles.value}>{stats.sleepHours} ч</Text>
-          <Text style={styles.smallText}>За последнюю ночь</Text>
-          <View style={{ marginTop: 8 }}>
-            <Button title="Записать сон" onPress={() => navigation.navigate('Sleep')} />
+          <View style={styles.cardHeaderRowAlt}>
+            <View style={styles.cardTitleRowLeft}>
+              <View style={[styles.iconCircle, styles.iconSleep]}>
+                <Text style={styles.iconEmoji}>🌙</Text>
+              </View>
+              <View style={styles.cardTitleTextContainer}>
+                <Text style={styles.cardTitleSmall} numberOfLines={1} ellipsizeMode="tail">
+                  Сон
+                </Text>
+                <Text
+                  style={styles.cardSubtitleSmall}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {stats.sleepHours > 0
+                    ? `${stats.sleepHours} ч за последнюю ночь`
+                    : 'Нет данных за сегодня'}
+                </Text>
+              </View>
+            </View>
+            {settings?.sleep.wakeAlarmEnabled && (
+              <Text style={styles.sleepBadge}>⏰ {settings.sleep.wakeTime}</Text>
+            )}
+          </View>
+          {stats.sleepHours > 0 ? (
+            <ProgressBar
+              current={stats.sleepHours}
+              max={settings?.sleep.targetHours ?? 8}
+              color="#4F46E5"
+            />
+          ) : (
+            <View style={{ marginTop: 8 }} />
+          )}
+          <TouchableOpacity
+            style={styles.sleepManageButton}
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate('Sleep')}
+          >
+            <Text style={styles.sleepManageText}>Управление сном →</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Карточка шагов и активности */}
+      <View style={styles.card}>
+        <View style={styles.cardHeaderRowAlt}>
+          <View style={styles.cardTitleRowLeft}>
+            <View style={[styles.iconCircle, styles.iconActivity]}>
+              <Text style={styles.iconEmoji}>❤️</Text>
+            </View>
+            <Text style={styles.cardTitleSmall}>Шаги и Активность</Text>
+          </View>
+          <Text style={styles.smallText}>
+            {steps} / {(profile?.dailyStepGoal ?? 10000)} шагов
+          </Text>
+        </View>
+        <ProgressBar
+          current={steps}
+          max={profile?.dailyStepGoal ?? 10000}
+          color="#EF4444"
+        />
+        <View style={{ marginTop: 12 }}>
+          <View style={styles.row}>
+            <TouchableOpacity
+              style={styles.trainingButtonWrapper}
+              activeOpacity={0.9}
+              onPress={() => (navigation as any).navigate('ActivityLogger')}
+            >
+              <LinearGradient
+                colors={['#f97316', '#fb7185']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.trainingButton}
+              >
+                <Text style={styles.trainingButtonText}>⚡ Добавить тренировку</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.syncButton}
+              activeOpacity={0.85}
+              onPress={onSyncSteps}
+            >
+              <Text style={styles.syncButtonText}>⟳ Синхронизация</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
 
-      {/* Карточка шагов и кнопка к логгеру еды */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Активность и шаги</Text>
-        <Text style={styles.value}>{steps}</Text>
-        <Text>Цель: 10000 шагов</Text>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Питание</Text>
-        <Button title="Добавить приём пищи" onPress={() => navigation.navigate('FoodLogger')} />
+        <View style={styles.foodAddRow}>
+          <Text style={styles.cardTitle}>Питание</Text>
+          <TouchableOpacity
+            style={styles.foodAddButton}
+            activeOpacity={0.9}
+            onPress={() => navigation.navigate('FoodLogger')}
+          >
+            <Text style={styles.foodAddButtonText}>Добавить приём пищи</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* История питания */}
@@ -414,10 +586,15 @@ export const DashboardScreen: React.FC = () => {
         )}
       </View>
     </ScrollView>
+  </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeContainer: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+  },
   container: {
     flex: 1,
     padding: 16,
@@ -612,6 +789,69 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6b7280',
   },
+  ringLabelSmall: {
+    fontSize: 11,
+    color: '#6b7280',
+    marginTop: 2,
+  },
+  ringBurned: {
+    fontSize: 11,
+    color: '#f97316',
+    marginTop: 2,
+  },
+  sleepBadge: {
+    fontSize: 12,
+    color: '#4F46E5',
+  },
+  cardHeaderRowAlt: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  cardTitleRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  iconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  iconWater: {
+    backgroundColor: '#e0f2fe',
+  },
+  iconSleep: {
+    backgroundColor: '#e0e7ff',
+  },
+  iconActivity: {
+    backgroundColor: '#fee2e2',
+  },
+  iconEmoji: {
+    fontSize: 16,
+  },
+  cardTitleTextContainer: {
+    minWidth: 0,
+    flexShrink: 1,
+  },
+  cardTitleSmall: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  cardSubtitleSmall: {
+    fontSize: 11,
+    color: '#6b7280',
+  },
+  cardBell: {
+    fontSize: 16,
+    color: '#9ca3af',
+  },
+  cardBellActive: {
+    color: '#0ea5e9',
+  },
   filterRowSmall: {
     flexDirection: 'row',
     backgroundColor: '#f3f4f6',
@@ -703,5 +943,101 @@ const styles = StyleSheet.create({
   },
   mealCalories: {
     fontWeight: '600',
+  },
+  waterButton: {
+    flex: 1,
+    backgroundColor: '#ecfeff',
+    borderRadius: 999,
+    paddingVertical: 8,
+    marginTop: 8,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#7dd3fc',
+    alignItems: 'center',
+  },
+  waterButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#0e7490',
+  },
+  waterReminderButton: {
+    marginTop: 10,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: '#ecfeff',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#bae6fd',
+  },
+  waterReminderText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0369a1',
+  },
+  sleepManageButton: {
+    marginTop: 10,
+    alignSelf: 'flex-end',
+  },
+  sleepManageText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#4F46E5',
+  },
+  trainingButtonWrapper: {
+    flex: 1.2,
+    marginRight: 8,
+  },
+  trainingButton: {
+    width: '100%',
+    paddingVertical: 10,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  trainingButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  syncButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+  },
+  syncButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#4b5563',
+  },
+  foodAddRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  foodAddButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: '#10b981',
+  },
+  foodAddButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  progressOuter: {
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: '#e5e7eb',
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  progressInner: {
+    height: '100%',
+    borderRadius: 999,
   },
 });

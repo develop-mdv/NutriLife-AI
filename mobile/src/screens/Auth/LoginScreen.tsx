@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, StyleSheet, ActivityIndicator } from 'react-native';
+import { AppButton } from '../../components/AppButton';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/RootNavigator';
 import { useAuth } from '../../context/AuthContext';
@@ -48,10 +49,13 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
       {loading ? (
         <ActivityIndicator />
       ) : (
-        <Button title="Войти" onPress={onSubmit} />
+        <AppButton title="Войти" onPress={onSubmit} />
       )}
       <View style={{ height: 16 }} />
-      <Button title="Нет аккаунта? Зарегистрироваться" onPress={() => navigation.navigate('Register')} />
+      <AppButton
+        title="Нет аккаунта? Зарегистрироваться"
+        onPress={() => navigation.navigate('Register')}
+      />
     </View>
   );
 };

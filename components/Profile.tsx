@@ -608,7 +608,7 @@ export const Profile: React.FC<ProfileProps> = ({
                              className="mt-2"
                         />
                     </div>
-                     <div>
+                    <div>
                         <label className="text-xs text-gray-500 uppercase font-bold tracking-wider ml-1">Имя</label>
                         <Input 
                             type="text" 
@@ -616,6 +616,18 @@ export const Profile: React.FC<ProfileProps> = ({
                             onChange={(e) => onUpdateProfile({...profile, name: e.target.value})}
                              className="mt-2"
                         />
+                    </div>
+                    <div>
+                        <label className="text-xs text-gray-500 uppercase font-bold tracking-wider ml-1">Пол</label>
+                        <select
+                            value={profile.gender}
+                            onChange={(e) => onUpdateProfile({ ...profile, gender: e.target.value as any })}
+                            className="mt-2 w-full rounded-2xl border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50"
+                        >
+                            <option value="male">Мужской</option>
+                            <option value="female">Женский</option>
+                            <option value="other">Другое</option>
+                        </select>
                     </div>
                 </div>
              </Card>

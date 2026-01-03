@@ -42,6 +42,8 @@ export const generateWellnessRoadmapForUser = async (
   ${userProfile.preferences ? `- Предпочтения в еде: ${userProfile.preferences}` : ''}
   ${userProfile.healthConditions ? `- Ограничения здоровья: ${userProfile.healthConditions}` : ''}
   
+  ОБЯЗАТЕЛЬНО учитывай пол (мужчина или женщина) при расчёте калорий, белка, шагов и формулировке рекомендаций.
+  
   ЗАДАЧА 1: Рассчитай конкретные целевые показатели (targets) на день:
   - dailyCalories: Используй формулу Миффлина-Сан Жеора с учетом активности и цели.
   - dailyWater: Рекомендуемый объем воды в мл (обычно 30-35 мл на кг).

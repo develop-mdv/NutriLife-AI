@@ -52,6 +52,26 @@ export interface SettingsApi {
   sleep: SleepConfigApi;
 }
 
+export interface RoadmapStepApi {
+  title: string;
+  description: string;
+  status: 'pending' | 'in_progress' | 'completed';
+}
+
+export interface RoadmapTargetsApi {
+  dailyCalories: number;
+  dailyWater: number;
+  dailySteps: number;
+  sleepHours: number;
+}
+
+export interface RoadmapApi {
+  _id?: string;
+  steps: RoadmapStepApi[];
+  targets: RoadmapTargetsApi;
+  updatedAt?: string;
+}
+
 export const getTodayStats = () => api.get<DailyStats | null>('/me/stats/today');
 export const updateTodayStats = (data: Partial<DailyStats>) =>
   api.put<DailyStats>('/me/stats/today', data);
@@ -69,3 +89,9 @@ export const updateProfile = (profile: Partial<UserProfileApi>) =>
 export const getSettings = () => api.get<SettingsApi>('/me/settings');
 export const updateSettings = (settings: Partial<SettingsApi>) =>
   api.put<SettingsApi>('/me/settings', settings);
+
+export const getRoadmap = () => api.get<RoadmapApi | null>('/me/roadmap');
+export const generateRoadmap = (wishes?: string) =>
+  api.post<RoadmapApi>('/me/roadmap/generate', wishes ? { wishes } : {});
+export const updateRoadmap = (data: Partial<Pick<RoadmapApi, 'steps' | 'targets'>>) =>
+  api.put<RoadmapApi>('/me/roadmap', data);
