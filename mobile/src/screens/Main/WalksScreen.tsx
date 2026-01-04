@@ -1,56 +1,59 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Linking } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, Linking, TextInput, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { AppButton } from '../../components/AppButton';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { useTodayStats } from '../../hooks/useTodayStats';
+import { getProfile, UserProfileApi } from '../../api/me';
+import { suggestWalks, validateWalkAddress, WalkingRouteApi, WalkMode } from '../../api/walks';
 
-interface SimpleRoute {
-  id: string;
-  title: string;
-  distanceKm: number;
-  durationMin: number;
-  description: string;
-  query: string; // текст для поиска в картах
+interface ProgressBarProps {
+  current: number;
+  max: number;
+  color: string;
 }
 
-const ROUTES: SimpleRoute[] = [
-  {
-    id: 'short',
-    title: 'Короткая прогулка (20–25 мин)',
-    distanceKm: 2,
-    durationMin: 25,
-    description: 'Лёгкий круг по району: прогуляться до ближайшего парка или сквера и обратно.',
-    query: 'парк рядом',
-  },
-  {
-    id: 'medium',
-    title: 'Средняя прогулка (40–50 мин)',
-    distanceKm: 3.5,
-    durationMin: 45,
-    description: 'Прогулка в среднем темпе: парк + захватить пару кварталов вдоль тихих улиц.',
-    query: 'большой парк рядом',
-  },
-  {
-    id: 'long',
-    title: 'Длинная прогулка (60–70 мин)',
-    distanceKm: 5,
-    durationMin: 65,
-    description: 'Маршрут для выходного: дойти до набережной, лесопарка или на длинный круг вокруг района.',
-    query: 'набережная или лесопарк рядом',
-  },
-];
+const ProgressBar: React.FC<ProgressBarProps> = ({ current, max, color }) => {
+  const ratio = max > 0 ? Math.min(current / max, 1) : 0;
+  return (
+    <View style={styles.progressOuter}>
+      <View style={[styles.progressInner, { width: `${ratio * 100}%`, backgroundColor: color }]} />
+    </View>
+  );
+};
 
 export const WalksScreen: React.FC = () => {
   const { stats: today } = useTodayStats();
+  const [profile, setProfile] = useState<UserProfileApi | null>(null);
+  const [stepGoal, setStepGoal] = useState<number>(10000);
+
+  const [activeTab, setActiveTab] = useState<WalkMode>('nearby');
+  const [routes, setRoutes] = useState<WalkingRouteApi[]>([]);
+  const [loading, setLoading] = useState(false);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locError, setLocError] = useState<string | null>(null);
+
+  const [customAddress, setCustomAddress] = useState('');
+  const [addressVerified, setAddressVerified] = useState(false);
+  const [verifiedAddress, setVerifiedAddress] = useState<string | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
+        const [p, perm] = await Promise.all([
+          getProfile().catch(() => null),
+          Location.requestForegroundPermissionsAsync(),
+        ]);
+
+        if (p && p.data) {
+          setProfile(p.data);
+          if (p.data.dailyStepGoal && p.data.dailyStepGoal > 0) {
+            setStepGoal(p.data.dailyStepGoal);
+          }
+        }
+
+        if (perm.status !== 'granted') {
           setLocError('Разрешите доступ к геолокации, чтобы подбирать маршруты рядом.');
           return;
         }
@@ -58,62 +61,299 @@ export const WalksScreen: React.FC = () => {
         setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
       } catch (e) {
         console.log('Ошибка геолокации', e);
-        setLocError('Не удалось получить местоположение.');
+        setLocError('Не удалось получить местоположение. Маршруты будут построены от центра города.');
       }
     })();
   }, []);
 
-  const stepsGoal = 10000;
-  const remainingSteps = Math.max(0, stepsGoal - (today.steps || 0));
-  const approxKm = (remainingSteps * 0.7) / 1000; // 0.7 м на шаг
+  const stepsNeeded = useMemo(
+    () => Math.max(0, stepGoal - (today.steps || 0)),
+    [stepGoal, today.steps],
+  );
 
-  const openYandex = (query: string) => {
-    const encoded = encodeURIComponent(query);
-    let url = `https://yandex.ru/maps/?mode=search&text=${encoded}`;
-    if (location) {
-      url += `&ll=${location.lng}%2C${location.lat}`;
+  const approxKm = useMemo(() => (stepsNeeded * 0.7) / 1000, [stepsNeeded]);
+
+  const handleVerifyAddress = async () => {
+    if (!customAddress.trim()) return;
+    try {
+      setIsVerifying(true);
+      setVerifiedAddress(null);
+      setLocError(null);
+      const res = await validateWalkAddress(customAddress);
+      const normalized = res.data.address;
+      if (normalized) {
+        setVerifiedAddress(normalized);
+        setAddressVerified(true);
+      } else {
+        setLocError('Не удалось найти такой адрес. Попробуйте уточнить.');
+        setAddressVerified(false);
+      }
+    } catch (e) {
+      console.log('Ошибка валидации адреса (walks)', e);
+      setLocError('Ошибка при проверке адреса. Попробуйте ещё раз.');
+    } finally {
+      setIsVerifying(false);
     }
-    Linking.openURL(url).catch((e) => console.log('Ошибка открытия Яндекс.Карт', e));
   };
 
-  const openGoogle = (query: string) => {
-    const encoded = encodeURIComponent(query);
-    let url = `https://www.google.com/maps/search/?api=1&query=${encoded}`;
-    Linking.openURL(url).catch((e) => console.log('Ошибка открытия Google Maps', e));
+  const fetchRoutes = async () => {
+    if (stepsNeeded <= 0) {
+      setLocError('Цель по шагам на сегодня уже выполнена!');
+      return;
+    }
+
+    setLoading(true);
+    setLocError(null);
+    setRoutes([]);
+
+    if (activeTab === 'custom_address' && !addressVerified) {
+      setLocError('Сначала введите и подтвердите адрес.');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const res = await suggestWalks(stepsNeeded, activeTab, {
+        lat: location?.lat ?? null,
+        lng: location?.lng ?? null,
+        customAddress: verifiedAddress || customAddress || undefined,
+      });
+      setRoutes(res.data || []);
+      if (!res.data || res.data.length === 0) {
+        setLocError('Не удалось подобрать маршруты. Попробуйте позже.');
+      }
+    } catch (e: any) {
+      console.log('Ошибка подбора маршрутов (walks) RAW:', e?.message, e?.code);
+      if (e?.response) {
+        console.log('walks status', e.response.status, e.response.data);
+      }
+      setLocError('Не удалось подобрать маршруты. Попробуйте позже.');
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const getYandexLink = (route: WalkingRouteApi) => {
+    let startPoint = '';
+    if (activeTab === 'custom_address' && verifiedAddress) {
+      startPoint = verifiedAddress;
+    } else if (location) {
+      startPoint = `${location.lat},${location.lng}`;
+    }
+
+    const start = encodeURIComponent(startPoint);
+    const routeEnd = encodeURIComponent(route.endLocation);
+
+    let rtext = '';
+
+    if (activeTab === 'nearby') {
+      const routeStart = encodeURIComponent(route.startLocation);
+      rtext = `${start}~${routeStart}~${routeEnd}`;
+    } else if (route.isRoundTrip) {
+      rtext = `${start}~${routeEnd}~${start}`;
+    } else {
+      rtext = `${start}~${routeEnd}`;
+    }
+
+    return `https://yandex.ru/maps/?rtext=${rtext}&rtt=pd`;
+  };
+
+  const getGoogleLink = (route: WalkingRouteApi) => {
+    let origin = '';
+    if (activeTab === 'custom_address' && verifiedAddress) {
+      origin = verifiedAddress;
+    } else if (location) {
+      origin = `${location.lat},${location.lng}`;
+    }
+
+    const destination = route.isRoundTrip ? origin : encodeURIComponent(route.endLocation);
+
+    let waypoints = '';
+    if (activeTab === 'nearby') {
+      waypoints = encodeURIComponent(route.startLocation);
+    } else if (route.isRoundTrip) {
+      waypoints = encodeURIComponent(route.endLocation);
+    }
+
+    let link = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=walking`;
+    if (waypoints) {
+      link += `&waypoints=${waypoints}`;
+    }
+    return link;
+  };
+
+  const openUrl = (url: string) => {
+    Linking.openURL(url).catch((e) => console.log('Ошибка открытия ссылки для прогулки', e));
+  };
+
+  useEffect(() => {
+    setAddressVerified(false);
+    setVerifiedAddress(null);
+    setCustomAddress('');
+  }, [activeTab]);
 
   return (
     <SafeAreaView style={styles.safeContainer} edges={['top']}>
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 24 }}>
-      <Text style={styles.title}>Прогулки</Text>
-      <Text style={styles.subtitle}>
-        Сегодня вы прошли {today.steps} шагов. Цель — {stepsGoal}. Осталось примерно {remainingSteps} шагов
-        (~{approxKm.toFixed(1)} км).
-      </Text>
-
-      {locError && (
-        <View style={styles.warning}>
-          <Text style={styles.warningText}>{locError}</Text>
+        <View style={styles.headerRow}>
+          <View>
+            <Text style={styles.title}>Прогулки 🚶</Text>
+            <Text style={styles.subtitle}>Маршруты для вашей цели</Text>
+          </View>
+          <View style={styles.headerStepsBox}>
+            <Text style={styles.headerStepsValue}>{today.steps}</Text>
+            <Text style={styles.headerStepsLabel}>из {stepGoal} шагов</Text>
+          </View>
         </View>
-      )}
 
-      {ROUTES.map((route) => (
-        <View key={route.id} style={styles.card}>
-          <Text style={styles.cardTitle}>{route.title}</Text>
-          <Text style={styles.meta}>
-            ≈ {route.distanceKm} км • {route.durationMin} мин пешком
+        <View style={styles.progressCard}>
+          <View style={styles.progressHeaderRow}>
+            <Text style={styles.progressTitle}>Прогресс цели</Text>
+            <Text style={styles.progressPercent}>
+              {stepGoal > 0 ? Math.round((today.steps / stepGoal) * 100) : 0}%
+            </Text>
+          </View>
+          <ProgressBar current={today.steps} max={stepGoal} color="#22c55e" />
+          <Text style={styles.progressText}>
+            Осталось: <Text style={styles.progressTextBold}>{stepsNeeded > 0 ? stepsNeeded : 0} шагов</Text> (~
+            {approxKm.toFixed(1)} км).
           </Text>
-          <Text style={styles.description}>{route.description}</Text>
-          <View style={styles.row}>
-            <AppButton title="Открыть в Яндекс.Картах" onPress={() => openYandex(route.query)} />
-          </View>
-          <View style={styles.row}>
-            <AppButton title="Открыть в Google Maps" onPress={() => openGoogle(route.query)} />
-          </View>
         </View>
-      ))}
-    </ScrollView>
-  </SafeAreaView>
+
+        {/* Tabs */}
+        <View style={styles.tabsRow}>
+          <TouchableOpacity
+            style={[styles.tabButton, activeTab === 'nearby' && styles.tabButtonActive]}
+            onPress={() => setActiveTab('nearby')}
+          >
+            <Text style={[styles.tabText, activeTab === 'nearby' && styles.tabTextActive]}>Рядом</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tabButton, activeTab === 'direct' && styles.tabButtonActive]}
+            onPress={() => setActiveTab('direct')}
+          >
+            <Text style={[styles.tabText, activeTab === 'direct' && styles.tabTextActive]}>От меня</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tabButton, activeTab === 'custom_address' && styles.tabButtonActive]}
+            onPress={() => setActiveTab('custom_address')}
+          >
+            <Text style={[styles.tabText, activeTab === 'custom_address' && styles.tabTextActive]}>От адреса</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Tab-specific info */}
+        {activeTab === 'custom_address' && (
+          <View style={styles.addressBlock}>
+            <View style={styles.addressRow}>
+              <TextInput
+                style={styles.addressInput}
+                placeholder="Введите адрес (дом, офис...)"
+                value={customAddress}
+                onChangeText={(text) => {
+                  setCustomAddress(text);
+                  setAddressVerified(false);
+                  setVerifiedAddress(null);
+                }}
+              />
+              <TouchableOpacity
+                style={[styles.verifyButton, (!customAddress || isVerifying) && styles.verifyButtonDisabled]}
+                activeOpacity={0.8}
+                disabled={!customAddress || isVerifying}
+                onPress={handleVerifyAddress}
+              >
+                {isVerifying ? <ActivityIndicator size="small" color="#047857" /> : <Text style={styles.verifyButtonText}>Проверить</Text>}
+              </TouchableOpacity>
+            </View>
+            {verifiedAddress && (
+              <View style={styles.addressVerifiedBox}>
+                <Text style={styles.addressVerifiedLabel}>Адрес найден:</Text>
+                <Text style={styles.addressVerifiedValue}>{verifiedAddress}</Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {activeTab === 'nearby' && (
+          <Text style={styles.modeHint}>ИИ найдёт красивые парки и скверы поблизости, где можно погулять.</Text>
+        )}
+        {activeTab === 'direct' && (
+          <Text style={styles.modeHint}>ИИ проложит маршрут от вашего текущего положения до интересного места и обратно.</Text>
+        )}
+
+        <View style={{ marginTop: 8 }}>
+          <AppButton
+            title={loading ? 'Строю маршруты...' : 'Подобрать прогулку'}
+            onPress={fetchRoutes}
+            disabled={loading || (activeTab === 'custom_address' && !addressVerified)}
+          />
+        </View>
+
+        {locError && (
+          <View style={styles.warning}>
+            <Text style={styles.warningText}>{locError}</Text>
+          </View>
+        )}
+
+        {loading && !locError && (
+          <View style={styles.loadingBox}>
+            <ActivityIndicator />
+            <Text style={styles.loadingText}>
+              {activeTab === 'nearby'
+                ? 'Ищу парки и зелёные зоны поблизости...'
+                : 'Подбираю прогулки под вашу цель...'}
+            </Text>
+          </View>
+        )}
+
+        {!loading && routes.length > 0 && (
+          <View style={{ marginTop: 16 }}>
+            <Text style={styles.routesTitle}>Найденные маршруты</Text>
+            {routes.map((route, idx) => (
+              <View key={idx} style={styles.routeCard}>
+                <View style={styles.routeHeaderRow}>
+                  <Text style={styles.routeTitle}>{route.title}</Text>
+                  <Text style={styles.routeDistance}>~{route.distanceKm} км</Text>
+                </View>
+
+                <View style={styles.routeBadgeRow}>
+                  {route.isRoundTrip ? (
+                    <Text style={[styles.routeBadge, styles.routeBadgeRound]}>
+                      Туда-обратно
+                    </Text>
+                  ) : (
+                    <Text style={[styles.routeBadge, styles.routeBadgeOneWay]}>
+                      В одну сторону
+                    </Text>
+                  )}
+                </View>
+
+                <Text style={styles.routeDescription}>{route.description}</Text>
+
+                <View style={styles.routeMetaRow}>
+                  <Text style={styles.routeMetaItem}>Старт: {route.startLocation}</Text>
+                  {route.endLocation && route.endLocation !== route.startLocation && !route.isRoundTrip && (
+                    <Text style={styles.routeMetaItem}>Финиш: {route.endLocation}</Text>
+                  )}
+                  {route.isRoundTrip && (
+                    <Text style={styles.routeMetaItem}>Через: {route.endLocation}</Text>
+                  )}
+                </View>
+
+                <View style={styles.routeButtonsRow}>
+                  <View style={{ flex: 1, marginRight: 8 }}>
+                    <AppButton title="Яндекс" onPress={() => openUrl(getYandexLink(route))} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <AppButton title="Google" onPress={() => openUrl(getGoogleLink(route))} />
+                  </View>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
@@ -126,45 +366,245 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   title: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
-    marginBottom: 8,
+    color: '#111827',
   },
   subtitle: {
-    color: '#4b5563',
-    marginBottom: 16,
-  },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  meta: {
-    fontSize: 13,
     color: '#6b7280',
+    marginTop: 2,
+    fontSize: 13,
+  },
+  headerStepsBox: {
+    alignItems: 'flex-end',
+  },
+  headerStepsValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#22c55e',
+  },
+  headerStepsLabel: {
+    fontSize: 11,
+    color: '#6b7280',
+  },
+  progressCard: {
+    backgroundColor: '#ecfdf5',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 14,
+  },
+  progressHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  progressTitle: {
+    fontSize: 13,
+    color: '#047857',
+    fontWeight: '600',
+  },
+  progressPercent: {
+    fontSize: 13,
+    color: '#047857',
+    fontWeight: '600',
+  },
+  progressOuter: {
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: '#d1fae5',
+    overflow: 'hidden',
+  },
+  progressInner: {
+    height: '100%',
+    borderRadius: 999,
+  },
+  progressText: {
+    marginTop: 6,
+    fontSize: 12,
+    color: '#047857',
+  },
+  progressTextBold: {
+    fontWeight: '700',
+  },
+  tabsRow: {
+    flexDirection: 'row',
+    backgroundColor: '#e5e7eb',
+    borderRadius: 999,
+    padding: 4,
     marginBottom: 8,
   },
-  description: {
-    marginBottom: 12,
-    color: '#374151',
+  tabButton: {
+    flex: 1,
+    borderRadius: 999,
+    paddingVertical: 6,
+    alignItems: 'center',
   },
-  row: {
+  tabButtonActive: {
+    backgroundColor: '#ffffff',
+  },
+  tabText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6b7280',
+  },
+  tabTextActive: {
+    color: '#111827',
+  },
+  addressBlock: {
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  addressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  addressInput: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#ffffff',
+    marginRight: 8,
+    fontSize: 14,
+  },
+  verifyButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 12,
+    backgroundColor: '#dcfce7',
+  },
+  verifyButtonDisabled: {
+    opacity: 0.5,
+  },
+  verifyButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#047857',
+  },
+  addressVerifiedBox: {
+    marginTop: 6,
+    borderRadius: 12,
+    padding: 8,
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  addressVerifiedLabel: {
+    fontSize: 11,
+    color: '#6b7280',
+  },
+  addressVerifiedValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  modeHint: {
+    fontSize: 12,
+    color: '#6b7280',
     marginTop: 4,
+    marginBottom: 8,
   },
   warning: {
-    padding: 12,
-    borderRadius: 8,
+    marginTop: 8,
+    padding: 10,
+    borderRadius: 10,
     backgroundColor: '#fee2e2',
-    marginBottom: 16,
   },
   warningText: {
     color: '#b91c1c',
+    fontSize: 12,
+  },
+  loadingBox: {
+    marginTop: 16,
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: '#6b7280',
+    textAlign: 'center',
+  },
+  routesTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 8,
+  },
+  routeCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  routeHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  routeTitle: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#111827',
+    marginRight: 8,
+  },
+  routeDistance: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#2563eb',
+    backgroundColor: '#eff6ff',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  routeBadgeRow: {
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  routeBadge: {
+    fontSize: 10,
+    fontWeight: '700',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    overflow: 'hidden',
+  },
+  routeBadgeRound: {
+    backgroundColor: '#f5f3ff',
+    color: '#6d28d9',
+  },
+  routeBadgeOneWay: {
+    backgroundColor: '#f3f4f6',
+    color: '#4b5563',
+  },
+  routeDescription: {
+    fontSize: 13,
+    color: '#4b5563',
+    marginTop: 4,
+  },
+  routeMetaRow: {
+    marginTop: 8,
+  },
+  routeMetaItem: {
+    fontSize: 11,
+    color: '#6b7280',
+    marginTop: 2,
+  },
+  routeButtonsRow: {
+    flexDirection: 'row',
+    marginTop: 10,
   },
 });

@@ -8,6 +8,7 @@ import {
   TextInput,
   Switch,
   TouchableOpacity,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Rect } from 'react-native-svg';
@@ -90,7 +91,6 @@ export const ProfileScreen: React.FC = () => {
   const [wishes, setWishes] = useState('');
   const [waterRemindersEnabled, setWaterRemindersEnabled] = useState(false);
   const [showGoalPicker, setShowGoalPicker] = useState(false);
-  const [showGenderPicker, setShowGenderPicker] = useState(false);
   const [selectedAchievement, setSelectedAchievement] = useState<AchievementMobile | null>(null);
   const [selectedCalorieIndex, setSelectedCalorieIndex] = useState<number | null>(null);
   const [selectedStepsIndex, setSelectedStepsIndex] = useState<number | null>(null);
@@ -745,18 +745,58 @@ export const ProfileScreen: React.FC = () => {
                 />
               </View>
             </View>
-            <View style={styles.formRow}>
-              <View style={styles.formFieldFull}>
-                <Text style={styles.formLabel}>Пол</Text>
+
+            <View style={styles.genderSectionRow}>
+              <Text style={styles.formLabel}>Пол</Text>
+              <View style={styles.genderCardsRow}>
                 <TouchableOpacity
-                  style={styles.selectField}
-                  activeOpacity={0.8}
-                  onPress={() => setShowGenderPicker(true)}
+                  activeOpacity={0.9}
+                  style={[
+                    styles.genderCard,
+                    (profile.gender === 'male' || !profile.gender) && styles.genderCardSelected,
+                  ]}
+                  onPress={() => setProfile({ ...profile, gender: 'male' })}
                 >
-                  <Text style={styles.selectFieldValue}>
-                    {profile.gender === 'female' ? 'Женский' : 'Мужской'}
-                  </Text>
-                  <Text style={styles.selectFieldIcon}>▾</Text>
+                  <View style={styles.genderImageStub}>
+                    <Image
+                      source={require('../../../male.png')}
+                      style={styles.genderImage}
+                      resizeMode="contain"
+                    />
+                  </View>
+                  <View style={styles.genderCardFooter}>
+                    <Text style={styles.genderLabel}>Мужской</Text>
+                    {(profile.gender === 'male' || !profile.gender) && (
+                      <View style={styles.genderCheckBadge}>
+                        <Text style={styles.genderCheckText}>✓</Text>
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  style={[
+                    styles.genderCard,
+                    profile.gender === 'female' && styles.genderCardSelected,
+                  ]}
+                  onPress={() => setProfile({ ...profile, gender: 'female' })}
+                >
+                  <View style={styles.genderImageStub}>
+                    <Image
+                      source={require('../../../female.png')}
+                      style={styles.genderImage}
+                      resizeMode="contain"
+                    />
+                  </View>
+                  <View style={styles.genderCardFooter}>
+                    <Text style={styles.genderLabel}>Женский</Text>
+                    {profile.gender === 'female' && (
+                      <View style={styles.genderCheckBadge}>
+                        <Text style={styles.genderCheckText}>✓</Text>
+                      </View>
+                    )}
+                  </View>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1370,27 +1410,61 @@ const styles = StyleSheet.create({
   formFieldFull: {
     marginTop: 8,
   },
-  genderRow: {
-    marginTop: 8,
+  genderSectionRow: {
+    marginTop: 12,
   },
-  selectField: {
+  genderCardsRow: {
+    flexDirection: 'row',
+    marginTop: 8,
+    justifyContent: 'space-between',
+  },
+  genderCard: {
+    flex: 1,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    backgroundColor: '#ffffff',
+    overflow: 'hidden',
+    marginRight: 8,
+  },
+  genderCardSelected: {
+    borderColor: '#22c55e',
+    backgroundColor: '#ecfdf5',
+  },
+  genderImageStub: {
+    height: 110,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+  },
+  genderImage: {
+    width: '70%',
+    height: '80%',
+  },
+  genderCardFooter: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: '#f9fafb',
   },
-  selectFieldValue: {
-    fontSize: 14,
+  genderLabel: {
+    fontSize: 15,
+    fontWeight: '600',
     color: '#111827',
   },
-  selectFieldIcon: {
+  genderCheckBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#22c55e',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  genderCheckText: {
+    color: '#ffffff',
     fontSize: 14,
-    color: '#9ca3af',
+    fontWeight: '700',
   },
   formLabel: {
     fontSize: 12,
@@ -1438,13 +1512,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 12,
     color: '#e5e7eb',
-  },
-  genderOverlayCard: {
-    width: '90%',
-    maxWidth: 400,
-    borderRadius: 20,
-    padding: 16,
-    backgroundColor: '#ffffff',
   },
   planStepsWrapper: {
     marginTop: 8,
