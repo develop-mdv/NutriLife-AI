@@ -38,7 +38,7 @@ export const DashboardScreen: React.FC = () => {
   const { items: foodItems, loading: foodLoading, load: loadFood } = useFoodToday();
   const [foodFilterType, setFoodFilterType] = useState<FoodFilterType>('today');
   const [foodDateRange, setFoodDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
-  const [expandedFoodId, setExpandedFoodId] = useState<string | null>(null);
+  const [selectedFood, setSelectedFood] = useState<(typeof foodItems)[number] | null>(null);
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
   const [profile, setProfile] = useState<UserProfileApi | null>(null);
@@ -539,19 +539,12 @@ export const DashboardScreen: React.FC = () => {
         ) : (
           filteredFoodEntries.map((item) => {
             const ts = typeof item.timestamp === 'number' ? item.timestamp : new Date(item.timestamp).getTime();
-            const isExpanded = expandedFoodId === String(item.id ?? item.timestamp);
             return (
               <TouchableOpacity
                 key={String(item.id ?? item.timestamp)}
-                style={[styles.mealRow, isExpanded && styles.mealRowExpanded]}
+                style={styles.mealRow}
                 activeOpacity={0.8}
-                onPress={() =>
-                  setExpandedFoodId((prev) =>
-                    prev === String(item.id ?? item.timestamp)
-                      ? null
-                      : String(item.id ?? item.timestamp),
-                  )
-                }
+                onPress={() => setSelectedFood(item)}
               >
                 {item.imageUri && (
                   <Image source={{ uri: item.imageUri }} style={styles.mealImage} />
@@ -565,19 +558,6 @@ export const DashboardScreen: React.FC = () => {
                       : ''}
                     {` • Оценка ${item.rating}/10`}
                   </Text>
-                  {isExpanded && (
-                    <View style={styles.mealExpandedBlock}>
-                      <Text style={styles.mealExpandedText}>
-                        Белки: {Math.round(item.protein)} г, Жиры: {Math.round(item.fat)} г, Углеводы:{' '}
-                        {Math.round(item.carbs)} г
-                      </Text>
-                      {item.recommendation ? (
-                        <Text style={styles.mealRecommendation}>
-                          {item.recommendation}
-                        </Text>
-                      ) : null}
-                    </View>
-                  )}
                 </View>
                 <Text style={styles.mealCalories}>{Math.round(item.calories)} ккал</Text>
               </TouchableOpacity>
@@ -586,11 +566,88 @@ export const DashboardScreen: React.FC = () => {
         )}
       </View>
     </ScrollView>
+
+    {/* ---- Модальное окно с подробностями блюда ---- */}
+    {selectedFood && (
+      <View style={styles.foodModalOverlay}>
+        <TouchableOpacity
+          style={StyleSheet.absoluteFillObject}
+          activeOpacity={1}
+          onPress={() => setSelectedFood(null)}
+        />
+        <View style={styles.foodModalCard}>
+          {selectedFood.imageUri ? (
+            <Image source={{ uri: selectedFood.imageUri }} style={styles.foodModalImage} />
+          ) : (
+            <View style={[styles.foodModalImage, styles.foodModalImagePlaceholder]}>
+              <Text style={styles.foodModalPlaceholderEmoji}>🍽️</Text>
+            </View>
+          )}
+
+          <View style={styles.foodModalContent}>
+            <Text style={styles.foodModalTitle}>{selectedFood.name}</Text>
+
+            <View style={styles.foodModalRatingRow}>
+              <View style={styles.foodModalRatingBadge}>
+                <Text style={styles.foodModalRatingText}>★ {selectedFood.rating}/10</Text>
+              </View>
+              <Text style={styles.foodModalCaloriesText}>{Math.round(selectedFood.calories)} ккал</Text>
+            </View>
+
+            <View style={styles.foodModalMacrosRow}>
+              <View style={styles.foodModalMacroItem}>
+                <Text style={styles.foodModalMacroValue}>{Math.round(selectedFood.protein)} г</Text>
+                <Text style={styles.foodModalMacroLabel}>Белки</Text>
+              </View>
+              <View style={styles.foodModalMacroItem}>
+                <Text style={styles.foodModalMacroValue}>{Math.round(selectedFood.fat)} г</Text>
+                <Text style={styles.foodModalMacroLabel}>Жиры</Text>
+              </View>
+              <View style={styles.foodModalMacroItem}>
+                <Text style={styles.foodModalMacroValue}>{Math.round(selectedFood.carbs)} г</Text>
+                <Text style={styles.foodModalMacroLabel}>Углеводы</Text>
+              </View>
+            </View>
+
+            {selectedFood.recommendation ? (
+              <View style={styles.foodModalRecommendationBox}>
+                <Text style={styles.foodModalRecommendationLabel}>💡 Комментарий ИИ</Text>
+                <Text style={styles.foodModalRecommendationText}>{selectedFood.recommendation}</Text>
+              </View>
+            ) : null}
+
+            <Text style={styles.foodModalTimestamp}>
+              {new Date(
+                typeof selectedFood.timestamp === 'number'
+                  ? selectedFood.timestamp
+                  : new Date(selectedFood.timestamp).getTime(),
+              ).toLocaleString([], {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </Text>
+          </View>
+
+          <TouchableOpacity style={styles.foodModalCloseButton} onPress={() => setSelectedFood(null)}>
+            <Text style={styles.foodModalCloseText}>Закрыть</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    )}
   </SafeAreaView>
   );
 };
 
+const macroGoalText = {
+  fontSize: 12,
+  color: '#9ca3af',
+};
+
 const styles = StyleSheet.create({
+  macroGoalText,
   safeContainer: {
     flex: 1,
     backgroundColor: '#ffffff',
@@ -910,11 +967,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
   },
-  mealRowExpanded: {
-    backgroundColor: '#f9fafb',
-    borderRadius: 8,
-    paddingHorizontal: 4,
-  },
   mealImage: {
     width: 40,
     height: 40,
@@ -928,21 +980,123 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6b7280',
   },
-  mealExpandedBlock: {
-    marginTop: 4,
-  },
-  mealExpandedText: {
-    fontSize: 12,
-    color: '#4b5563',
-  },
-  mealRecommendation: {
-    marginTop: 2,
-    fontSize: 12,
-    color: '#6b7280',
-    fontStyle: 'italic',
-  },
   mealCalories: {
     fontWeight: '600',
+  },
+  // ---- Стили для модального окна блюда ----
+  foodModalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+    zIndex: 999,
+  },
+  foodModalCard: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    overflow: 'hidden',
+    elevation: 8,
+  },
+  foodModalImage: {
+    width: '100%',
+    height: 180,
+  },
+  foodModalImagePlaceholder: {
+    backgroundColor: '#f3f4f6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  foodModalPlaceholderEmoji: {
+    fontSize: 48,
+  },
+  foodModalContent: {
+    padding: 16,
+  },
+  foodModalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 8,
+    color: '#111827',
+  },
+  foodModalRatingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  foodModalRatingBadge: {
+    backgroundColor: '#fef3c7',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginRight: 12,
+  },
+  foodModalRatingText: {
+    color: '#d97706',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  foodModalCaloriesText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#10b981',
+  },
+  foodModalMacrosRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+    paddingTop: 12,
+  },
+  foodModalMacroItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  foodModalMacroValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  foodModalMacroLabel: {
+    fontSize: 11,
+    color: '#6b7280',
+    marginTop: 2,
+  },
+  foodModalRecommendationBox: {
+    backgroundColor: '#ecfdf5',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+  },
+  foodModalRecommendationLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#059669',
+    marginBottom: 4,
+  },
+  foodModalRecommendationText: {
+    fontSize: 13,
+    color: '#064e3b',
+    lineHeight: 18,
+  },
+  foodModalTimestamp: {
+    fontSize: 12,
+    color: '#9ca3af',
+    textAlign: 'center',
+  },
+  foodModalCloseButton: {
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  foodModalCloseText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#6b7280',
   },
   waterButton: {
     flex: 1,
