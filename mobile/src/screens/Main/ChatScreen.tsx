@@ -10,12 +10,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChatMessage, sendChatMessage } from '../../api/ai';
+import { ChatDaySummary, ChatMessage, getChatDays, getChatHistory, sendChatMessage } from '../../api/ai';
 import { AppButton } from '../../components/AppButton';
-import { useTodayStats } from '../../hooks/useTodayStats';
-import { useFoodToday } from '../../hooks/useFoodToday';
-import { useHistoryStats } from '../../hooks/useHistoryStats';
-import { getProfile, getSettings, UserProfileApi, SettingsApi } from '../../api/me';
 
 const renderMessageText = (text: string, isUser: boolean) => {
   const paragraphs = text.split(/\n{2,}/g);
@@ -53,114 +49,81 @@ const renderMessageText = (text: string, isUser: boolean) => {
 };
 
 export const ChatScreen: React.FC = () => {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      role: 'model',
-      text: 'Привет! Я твой ИИ-тренер по питанию, сну и активности. Я вижу твои данные по питанию, сну и активности. Задай мне вопрос или попроси скорректировать план.',
-    },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [profile, setProfile] = useState<UserProfileApi | null>(null);
-  const [settings, setSettings] = useState<SettingsApi | null>(null);
+  const [days, setDays] = useState<ChatDaySummary[]>([]);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [loadingDays, setLoadingDays] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
-  const { stats: todayStats } = useTodayStats();
-  const { items: foodItems, load: loadFood } = useFoodToday();
-  const { history } = useHistoryStats();
+  const formatDayLabel = (day: string) => {
+    const today = new Date();
+    const todayStr = today.toISOString().slice(0, 10);
+    const d = new Date(day);
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().slice(0, 10);
 
+    if (day === todayStr) return 'Сегодня';
+    if (day === yesterdayStr) return 'Вчера';
+    const dd = d.getDate().toString().padStart(2, '0');
+    const mm = (d.getMonth() + 1).toString().padStart(2, '0');
+    return `${dd}.${mm}`;
+  };
+
+  const ensureGreetingIfEmpty = (day: string, items: ChatMessage[]): ChatMessage[] => {
+    if (items.length > 0) return items;
+    const label = formatDayLabel(day);
+    return [
+      {
+        role: 'model',
+        text: `Привет! Это чат с твоим ИИ-тренером за ${label.toLowerCase()}. Задай мне вопрос или попроси скорректировать план.`,
+      },
+    ];
+  };
+
+  const loadHistoryForDay = async (day: string) => {
+    setLoadingHistory(true);
+    try {
+      const res = await getChatHistory(day, 100);
+      const items = res.data || [];
+      const mapped = items.map((m) => ({ role: m.role, text: m.text }));
+      setMessages(ensureGreetingIfEmpty(day, mapped));
+    } catch (e) {
+      console.log('Ошибка загрузки истории чата за день', e);
+      setMessages(ensureGreetingIfEmpty(day, []));
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  // При открытии экрана подгружаем список дней и историю за последний день
   useEffect(() => {
     (async () => {
+      setLoadingDays(true);
       try {
-        const [p, s] = await Promise.all([getProfile(), getSettings()]);
-        setProfile(p.data);
-        setSettings(s.data);
-        // загрузим историю еды для контекста
-        loadFood();
+        const res = await getChatDays();
+        const list = res.data || [];
+        setDays(list);
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const initialDay = list.length > 0 ? list[0].day : todayStr;
+        setSelectedDay(initialDay);
+        await loadHistoryForDay(initialDay);
       } catch (e) {
-        console.log('Ошибка загрузки профиля/настроек для чата', e);
+        console.log('Ошибка загрузки списка дней чата', e);
+        const todayStr = new Date().toISOString().slice(0, 10);
+        setSelectedDay(todayStr);
+        await loadHistoryForDay(todayStr);
+      } finally {
+        setLoadingDays(false);
       }
     })();
-  }, [loadFood]);
-
-  const context = useMemo(() => {
-    if (!profile) return '';
-    let ctx = 'Данные пользователя:\\n';
-    const genderRu = profile.gender === 'male' ? 'мужской' : profile.gender === 'female' ? 'женский' : 'другой';
-    ctx += `Имя: ${profile.name}, Возраст: ${profile.age}, Пол: ${genderRu}, Рост: ${profile.height}, Вес: ${profile.weight}, `;
-    ctx += `Цель: ${profile.goal === 'lose_weight' ? 'Похудение' : profile.goal === 'gain_muscle' ? 'Набор массы' : 'Поддержание'}.\\n`;
-    if (profile.allergies) ctx += `Аллергии: ${profile.allergies}\n`;
-    if (profile.preferences) ctx += `Предпочтения: ${profile.preferences}\n`;
-    if (profile.healthConditions) ctx += `Здоровье: ${profile.healthConditions}\n`;
-
-    if (todayStats) {
-      ctx += `Статистика за сегодня: ${todayStats.calories} ккал, ${todayStats.steps} шагов, ${todayStats.water} мл воды, сон ${todayStats.sleepHours} ч.\n`;
-    }
-
-    // История питания: последние 7 дней, сгруппировано по датам
-    if (foodItems && foodItems.length > 0) {
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const todayStart = today.getTime();
-      const weekStart = todayStart - 6 * 24 * 60 * 60 * 1000; // последние 7 дней включая сегодня
-
-      const recent = foodItems
-        .filter((f) => {
-          const ts = typeof f.timestamp === 'number' ? f.timestamp : new Date(f.timestamp).getTime();
-          return ts >= weekStart;
-        })
-        .sort((a, b) => a.timestamp - b.timestamp);
-
-      if (recent.length > 0) {
-        const byDay: Record<string, string[]> = {};
-        const labels: Record<string, string> = {};
-        const todayIso = today.toISOString().slice(0, 10);
-
-        for (const f of recent) {
-          const ts = typeof f.timestamp === 'number' ? f.timestamp : new Date(f.timestamp).getTime();
-          const d = new Date(ts);
-          const key = d.toISOString().slice(0, 10);
-          const dateLabel = d.toLocaleDateString(undefined, { day: '2-digit', month: '2-digit' });
-          const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-          const line = `${time} — ${f.name} (${Math.round(f.calories)} ккал)`;
-          if (!byDay[key]) {
-            byDay[key] = [];
-            labels[key] = key === todayIso ? `Сегодня (${dateLabel})` : dateLabel;
-          }
-          byDay[key].push(line);
-        }
-
-        const sortedKeys = Object.keys(byDay).sort();
-        for (const key of sortedKeys) {
-          const label = labels[key] || key;
-          const lines = byDay[key].join('; ');
-          ctx += `Питание ${label}: ${lines}.\\n`;
-        }
-      }
-    }
-
-    // Последний сон из истории
-    if (history && history.length > 0) {
-      const lastSleep = [...history]
-        .slice()
-        .reverse()
-        .find((d) => d.sleepHours && d.sleepHours > 0);
-      if (lastSleep) {
-        ctx += `Последний сон: ${lastSleep.sleepHours} часов (дата ${lastSleep.date}).\n`;
-      }
-    }
-
-    // Настройки сна
-    if (settings?.sleep) {
-      const s = settings.sleep;
-      ctx += `Настройки сна: цель ${s.targetHours} ч, отбой ${s.bedTime}, подъём ${s.wakeTime} (${s.wakeAlarmEnabled ? 'будильник включен' : 'будильник выключен'}).\n`;
-    }
-
-    return ctx;
-  }, [profile, todayStats, foodItems, history, settings]);
+  }, []);
 
   const onSend = async () => {
     const text = input.trim();
-    if (!text || loading) return;
+    if (!text || loading || !selectedDay) return;
 
     const userMsg: ChatMessage = { role: 'user', text };
     setMessages((prev) => [...prev, userMsg]);
@@ -168,7 +131,8 @@ export const ChatScreen: React.FC = () => {
     setLoading(true);
 
     try {
-      const res = await sendChatMessage(messages, text, context || undefined);
+      // Передаём только сообщения текущего дня как историю для модели
+      const res = await sendChatMessage(messages, text);
       const rawText = res.data.text;
 
       // Обработка тега [UPDATE_PLAN: ...] как в веб-версии
@@ -231,6 +195,40 @@ export const ChatScreen: React.FC = () => {
         <Text style={styles.subtitle}>Твой ИИ-тренер по питанию, сну и активности</Text>
       </View>
 
+      {/* Переключатель дневных чатов за неделю */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.daysRow}
+      >
+        {selectedDay && (
+          <>
+            {[selectedDay, ...days.filter((d) => d.day !== selectedDay).map((d) => d.day)]
+              .filter((v, idx, arr) => arr.indexOf(v) === idx)
+              .slice(0, 7)
+              .map((day) => {
+                const isActive = day === selectedDay;
+                const summary = days.find((d) => d.day === day);
+                return (
+                  <AppButton
+                    key={day}
+                    title={summary ? `${formatDayLabel(day)}` : formatDayLabel(day)}
+                    onPress={() => {
+                      if (day === selectedDay) return;
+                      setSelectedDay(day);
+                      loadHistoryForDay(day);
+                    }}
+                    style={[
+                      styles.dayChip,
+                      isActive && styles.dayChipActive,
+                    ]}
+                  />
+                );
+              })}
+          </>
+        )}
+      </ScrollView>
+
       <ScrollView
         style={styles.messages}
         contentContainerStyle={{ paddingTop: 4, paddingBottom: 16, flexGrow: 1 }}
@@ -247,6 +245,11 @@ export const ChatScreen: React.FC = () => {
             {renderMessageText(m.text, m.role === 'user')}
           </View>
         ))}
+        {loadingHistory && (
+          <View style={[styles.bubble, styles.bubbleModel]}>
+            <ActivityIndicator />
+          </View>
+        )}
         {loading && (
           <View style={[styles.bubble, styles.bubbleModel]}>
             <ActivityIndicator />
@@ -280,6 +283,24 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 8,
+  },
+  daysRow: {
+    flexDirection: 'row',
+    paddingVertical: 4,
+    marginHorizontal: -4,
+  },
+  dayChip: {
+    marginHorizontal: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#d4d4d8',
+    backgroundColor: '#ffffff',
+  },
+  dayChipActive: {
+    backgroundColor: '#4ade80',
+    borderColor: '#22c55e',
   },
   title: {
     fontSize: 22,

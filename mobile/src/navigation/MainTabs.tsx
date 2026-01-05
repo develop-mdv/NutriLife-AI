@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { CommonActions } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DashboardScreen } from '../screens/Main/DashboardScreen';
 import { ChatScreen } from '../screens/Main/ChatScreen';
@@ -46,7 +47,24 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigat
             });
 
             if (!isFocused && !event.defaultPrevented) {
-              navigation.navigate(route.name as never);
+              const currentRoute = state.routes[state.index];
+              const currentParams: any = currentRoute.params;
+
+              const leavingProfileWithUnsaved =
+                currentRoute.name === 'Profile' &&
+                route.name !== 'Profile' &&
+                currentParams?.hasUnsavedSettings;
+
+              if (leavingProfileWithUnsaved) {
+                // вместо прямого перехода отдаём действие экрану профиля,
+                // чтобы он показал модалку и потом выполнил этот переход
+                const navAction = CommonActions.navigate({ name: route.name });
+                navigation.navigate('Profile' as never, {
+                  profilePendingNavAction: navAction,
+                } as never);
+              } else {
+                navigation.navigate(route.name as never);
+              }
             }
           };
 

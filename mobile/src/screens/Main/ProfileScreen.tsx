@@ -11,6 +11,7 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import Svg, { Rect } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppButton } from '../../components/AppButton';
@@ -74,6 +75,8 @@ const translateGoal = (goal: string | undefined) => {
 
 export const ProfileScreen: React.FC = () => {
   const { user, logout } = useAuth();
+  const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const { stats: todayStats } = useTodayStats();
   const { loading: historyLoading, history, summary } = useHistoryStats();
 
@@ -83,6 +86,8 @@ export const ProfileScreen: React.FC = () => {
   const [profile, setProfile] = useState<UserProfileApi | null>(null);
   const [settings, setSettings] = useState<SettingsApi | null>(null);
   const [roadmap, setRoadmap] = useState<RoadmapApi | null>(null);
+  const [initialProfile, setInitialProfile] = useState<UserProfileApi | null>(null);
+  const [initialSettings, setInitialSettings] = useState<SettingsApi | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loadingRoadmap, setLoadingRoadmap] = useState(false);
@@ -94,6 +99,11 @@ export const ProfileScreen: React.FC = () => {
   const [selectedAchievement, setSelectedAchievement] = useState<AchievementMobile | null>(null);
   const [selectedCalorieIndex, setSelectedCalorieIndex] = useState<number | null>(null);
   const [selectedStepsIndex, setSelectedStepsIndex] = useState<number | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [pendingTab, setPendingTab] = useState<ActiveTab | null>(null);
+  const [pendingLogout, setPendingLogout] = useState(false);
+  const [pendingNavAction, setPendingNavAction] = useState<any | null>(null);
+  const [showUnsavedModal, setShowUnsavedModal] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -106,6 +116,8 @@ export const ProfileScreen: React.FC = () => {
         ]);
         setProfile(p.data);
         setSettings(s.data);
+        setInitialProfile(p.data);
+        setInitialSettings(s.data);
         setRoadmap(r.data || null);
         if (waterFlag === 'true') setWaterRemindersEnabled(true);
       } catch (e) {
@@ -124,6 +136,9 @@ export const ProfileScreen: React.FC = () => {
         updateProfile(profile),
         updateSettings(settings),
       ]);
+      setHasUnsavedChanges(false);
+      // после сохранения актуализируем план под новые данные
+      await onGeneratePlan(false);
     } catch (e) {
       console.log('Ошибка сохранения профиля/настроек', e);
     } finally {
@@ -137,6 +152,8 @@ export const ProfileScreen: React.FC = () => {
       const [p, s, r] = await Promise.all([getProfile(), getSettings(), getRoadmap()]);
       setProfile(p.data);
       setSettings(s.data);
+      setInitialProfile(p.data);
+      setInitialSettings(s.data);
       setRoadmap(r.data || null);
     } catch (e) {
       console.log('Ошибка обновления профиля/плана', e);
@@ -197,6 +214,84 @@ export const ProfileScreen: React.FC = () => {
     const month = dt.getMonth() + 1;
     return `${day}.${month < 10 ? `0${month}` : month}`;
   };
+
+  const hasRealUnsavedChanges = () => {
+    if (!profile || !settings || !initialProfile || !initialSettings) return false;
+    try {
+      const currentProfile = JSON.stringify(profile);
+      const savedProfile = JSON.stringify(initialProfile);
+      const currentSettings = JSON.stringify(settings);
+      const savedSettings = JSON.stringify(initialSettings);
+      return currentProfile !== savedProfile || currentSettings !== savedSettings;
+    } catch {
+      return false;
+    }
+  };
+
+  // Обновляем параметр маршрута, чтобы нижняя таб-навигция знала, что на вкладке "Настройки" есть несохранённые изменения
+  useEffect(() => {
+    const flag = activeTab === 'settings' && hasRealUnsavedChanges();
+    navigation.setParams({ hasUnsavedSettings: flag });
+  }, [activeTab, profile, settings, initialProfile, initialSettings, navigation]);
+
+  // Обрабатываем запрос на переход на другой нижний таб при наличии несохранённых настроек
+  useEffect(() => {
+    const params: any = route.params;
+    if (!params || !params.profilePendingNavAction) return;
+
+    const navAction = params.profilePendingNavAction;
+
+    if (activeTab === 'settings' && hasRealUnsavedChanges()) {
+      setPendingTab(null);
+      setPendingLogout(false);
+      setPendingNavAction(navAction);
+      setShowUnsavedModal(true);
+    } else {
+      // если почему-то уже нет изменений, просто выполняем переход
+      navigation.dispatch(navAction);
+    }
+
+    // очищаем параметр, чтобы не сработало повторно
+    navigation.setParams({ profilePendingNavAction: undefined });
+  }, [route.params, activeTab, profile, settings, initialProfile, initialSettings, navigation]);
+
+  const requestTabChange = (next: ActiveTab) => {
+    if (next === activeTab) return;
+    if (activeTab === 'settings' && hasRealUnsavedChanges()) {
+      setPendingTab(next);
+      setShowUnsavedModal(true);
+    } else {
+      setActiveTab(next);
+    }
+  };
+
+  const requestLogout = () => {
+    if (activeTab === 'settings' && hasRealUnsavedChanges()) {
+      setPendingTab(null);
+      setPendingLogout(true);
+      setPendingNavAction(null);
+      setShowUnsavedModal(true);
+    } else {
+      logout();
+    }
+  };
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
+      // Если выходим с профиля, находясь на вкладке "Настройки" с несохранёнными изменениями,
+      // блокируем переход и показываем модалку.
+      if (activeTab !== 'settings') return;
+      if (!hasRealUnsavedChanges()) return;
+
+      e.preventDefault();
+      setPendingTab(null);
+      setPendingLogout(false);
+      setPendingNavAction(e.data.action);
+      setShowUnsavedModal(true);
+    });
+
+    return unsubscribe;
+  }, [navigation, activeTab, profile, settings, initialProfile, initialSettings]);
 
   const achievements: AchievementMobile[] = useMemo(() => {
     if (!profile || !settings) return [];
@@ -369,19 +464,19 @@ export const ProfileScreen: React.FC = () => {
       <View style={styles.tabsRow}>
         <TouchableOpacity
           style={[styles.tabButton, activeTab === 'stats' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('stats')}
+          onPress={() => requestTabChange('stats')}
         >
           <Text style={[styles.tabText, activeTab === 'stats' && styles.tabTextActive]}>Статистика</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tabButton, activeTab === 'plan' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('plan')}
+          onPress={() => requestTabChange('plan')}
         >
           <Text style={[styles.tabText, activeTab === 'plan' && styles.tabTextActive]}>Мой план</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tabButton, activeTab === 'settings' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('settings')}
+          onPress={() => requestTabChange('settings')}
         >
           <Text style={[styles.tabText, activeTab === 'settings' && styles.tabTextActive]}>Настройки</Text>
         </TouchableOpacity>
@@ -704,7 +799,10 @@ export const ProfileScreen: React.FC = () => {
                 <TextInput
                   style={styles.input}
                   value={profile.name}
-                  onChangeText={(text) => setProfile({ ...profile, name: text })}
+                  onChangeText={(text) => {
+                    setProfile({ ...profile, name: text });
+                    setHasUnsavedChanges(true);
+                  }}
                 />
               </View>
             </View>
@@ -715,9 +813,10 @@ export const ProfileScreen: React.FC = () => {
                   style={styles.input}
                   keyboardType="numeric"
                   value={String(profile.height || '')}
-                  onChangeText={(text) =>
-                    setProfile({ ...profile, height: Number(text) || 0 })
-                  }
+                  onChangeText={(text) => {
+                    setProfile({ ...profile, height: Number(text) || 0 });
+                    setHasUnsavedChanges(true);
+                  }}
                 />
               </View>
               <View style={styles.formField}>
@@ -726,9 +825,10 @@ export const ProfileScreen: React.FC = () => {
                   style={styles.input}
                   keyboardType="numeric"
                   value={String(profile.weight || '')}
-                  onChangeText={(text) =>
-                    setProfile({ ...profile, weight: Number(text) || 0 })
-                  }
+                  onChangeText={(text) => {
+                    setProfile({ ...profile, weight: Number(text) || 0 });
+                    setHasUnsavedChanges(true);
+                  }}
                 />
               </View>
             </View>
@@ -739,27 +839,31 @@ export const ProfileScreen: React.FC = () => {
                   style={styles.input}
                   keyboardType="numeric"
                   value={String(profile.age || '')}
-                  onChangeText={(text) =>
-                    setProfile({ ...profile, age: Number(text) || 0 })
-                  }
+                  onChangeText={(text) => {
+                    setProfile({ ...profile, age: Number(text) || 0 });
+                    setHasUnsavedChanges(true);
+                  }}
                 />
               </View>
             </View>
 
             <View style={styles.genderSectionRow}>
               <Text style={styles.formLabel}>Пол</Text>
-              <View style={styles.genderCardsRow}>
-                <TouchableOpacity
-                  activeOpacity={0.9}
-                  style={[
-                    styles.genderCard,
-                    (profile.gender === 'male' || !profile.gender) && styles.genderCardSelected,
-                  ]}
-                  onPress={() => setProfile({ ...profile, gender: 'male' })}
+                <View style={styles.genderCardsRow}>
+                  <TouchableOpacity
+                    activeOpacity={0.9}
+                    style={[
+                      styles.genderCard,
+                      (profile.gender === 'male' || !profile.gender) && styles.genderCardSelected,
+                    ]}
+                    onPress={() => {
+                      setProfile({ ...profile, gender: 'male' });
+                      setHasUnsavedChanges(true);
+                    }}
                 >
                   <View style={styles.genderImageStub}>
                     <Image
-                      source={require('../../../male.png')}
+                      source={require('../../../assets/images/male.png')}
                       style={styles.genderImage}
                       resizeMode="contain"
                     />
@@ -780,11 +884,14 @@ export const ProfileScreen: React.FC = () => {
                     styles.genderCard,
                     profile.gender === 'female' && styles.genderCardSelected,
                   ]}
-                  onPress={() => setProfile({ ...profile, gender: 'female' })}
+                  onPress={() => {
+                    setProfile({ ...profile, gender: 'female' });
+                    setHasUnsavedChanges(true);
+                  }}
                 >
                   <View style={styles.genderImageStub}>
                     <Image
-                      source={require('../../../female.png')}
+                      source={require('../../../assets/images/female.png')}
                       style={styles.genderImage}
                       resizeMode="contain"
                     />
@@ -812,12 +919,13 @@ export const ProfileScreen: React.FC = () => {
                   style={styles.input}
                   keyboardType="numeric"
                   value={String(profile.dailyCalorieGoal || '')}
-                  onChangeText={(text) =>
+                  onChangeText={(text) => {
                     setProfile({
                       ...profile,
                       dailyCalorieGoal: Number(text) || 0,
-                    })
-                  }
+                    });
+                    setHasUnsavedChanges(true);
+                  }}
                 />
               </View>
             </View>
@@ -828,12 +936,13 @@ export const ProfileScreen: React.FC = () => {
                   style={styles.input}
                   keyboardType="numeric"
                   value={String(profile.dailyStepGoal || '')}
-                  onChangeText={(text) =>
+                  onChangeText={(text) => {
                     setProfile({
                       ...profile,
                       dailyStepGoal: Number(text) || 0,
-                    })
-                  }
+                    });
+                    setHasUnsavedChanges(true);
+                  }}
                 />
               </View>
               <View style={styles.formField}>
@@ -842,12 +951,13 @@ export const ProfileScreen: React.FC = () => {
                   style={styles.input}
                   keyboardType="numeric"
                   value={String(settings.waterGoal || '')}
-                  onChangeText={(text) =>
+                  onChangeText={(text) => {
                     setSettings({
                       ...settings,
                       waterGoal: Number(text) || 0,
-                    })
-                  }
+                    });
+                    setHasUnsavedChanges(true);
+                  }}
                 />
               </View>
             </View>
@@ -862,9 +972,10 @@ export const ProfileScreen: React.FC = () => {
                 style={[styles.input, styles.textArea]}
                 multiline
                 value={profile.allergies || ''}
-                onChangeText={(text) =>
-                  setProfile({ ...profile, allergies: text })
-                }
+                onChangeText={(text) => {
+                  setProfile({ ...profile, allergies: text });
+                  setHasUnsavedChanges(true);
+                }}
                 placeholder="Орехи, мед..."
               />
             </View>
@@ -874,9 +985,10 @@ export const ProfileScreen: React.FC = () => {
                 style={[styles.input, styles.textArea]}
                 multiline
                 value={profile.preferences || ''}
-                onChangeText={(text) =>
-                  setProfile({ ...profile, preferences: text })
-                }
+                onChangeText={(text) => {
+                  setProfile({ ...profile, preferences: text });
+                  setHasUnsavedChanges(true);
+                }}
                 placeholder="Вегетарианец, люблю острое..."
               />
             </View>
@@ -886,9 +998,10 @@ export const ProfileScreen: React.FC = () => {
                 style={[styles.input, styles.textArea]}
                 multiline
                 value={profile.healthConditions || ''}
-                onChangeText={(text) =>
-                  setProfile({ ...profile, healthConditions: text })
-                }
+                onChangeText={(text) => {
+                  setProfile({ ...profile, healthConditions: text });
+                  setHasUnsavedChanges(true);
+                }}
                 placeholder="Диабет, травма колена..."
               />
             </View>
@@ -904,15 +1017,16 @@ export const ProfileScreen: React.FC = () => {
                   style={styles.input}
                   keyboardType="numeric"
                   value={String(settings.sleep.targetHours || '')}
-                  onChangeText={(text) =>
+                  onChangeText={(text) => {
                     setSettings({
                       ...settings,
                       sleep: {
                         ...settings.sleep,
                         targetHours: Number(text) || 0,
                       },
-                    })
-                  }
+                    });
+                    setHasUnsavedChanges(true);
+                  }}
                 />
               </View>
             </View>
@@ -927,6 +1041,7 @@ export const ProfileScreen: React.FC = () => {
                       ...settings,
                       sleep: { ...settings.sleep, bedTime: text },
                     });
+                    setHasUnsavedChanges(true);
                     if (settings.sleep.bedTimeReminderEnabled) {
                       await scheduleOrCancelSleep('sleep_bed', true, text);
                     }
@@ -943,6 +1058,7 @@ export const ProfileScreen: React.FC = () => {
                       ...settings,
                       sleep: { ...settings.sleep, wakeTime: text },
                     });
+                    setHasUnsavedChanges(true);
                     if (settings.sleep.wakeAlarmEnabled) {
                       await scheduleOrCancelSleep('sleep_wake', true, text);
                     }
@@ -1009,7 +1125,7 @@ export const ProfileScreen: React.FC = () => {
       )}
 
       <View style={{ marginTop: 24 }}>
-        <AppButton title="Выйти" onPress={logout} />
+        <AppButton title="Выйти" onPress={requestLogout} />
       </View>
     </ScrollView>
 
@@ -1038,6 +1154,64 @@ export const ProfileScreen: React.FC = () => {
               title={generatingPlan ? 'Обновляю...' : 'Обновить план'}
               onPress={() => onGeneratePlan(true)}
               disabled={generatingPlan}
+            />
+          </View>
+        </View>
+      </View>
+    )}
+
+    {showUnsavedModal && (
+      <View style={styles.planOverlay}>
+        <TouchableOpacity
+          style={StyleSheet.absoluteFillObject}
+          activeOpacity={1}
+          onPress={() => {
+            setShowUnsavedModal(false);
+            setPendingTab(null);
+            setPendingLogout(false);
+            setPendingNavAction(null);
+          }}
+        />
+        <View style={styles.goalOverlayCard}>
+          <Text style={styles.goalOverlayTitle}>Сохранить изменения?</Text>
+          <Text style={styles.goalOverlaySubtitle}>
+            Вы изменили настройки профиля. Сохранить их перед выходом?
+          </Text>
+          <View style={styles.planOverlayButtonsRow}>
+            <AppButton
+              title="Не сохранять"
+              onPress={async () => {
+                setShowUnsavedModal(false);
+                setHasUnsavedChanges(false);
+                await reloadProfileAndRoadmap();
+                if (pendingTab) {
+                  setActiveTab(pendingTab);
+                } else if (pendingNavAction) {
+                  navigation.dispatch(pendingNavAction);
+                } else if (pendingLogout) {
+                  logout();
+                }
+                setPendingTab(null);
+                setPendingLogout(false);
+                setPendingNavAction(null);
+              }}
+            />
+            <AppButton
+              title="Сохранить"
+              onPress={async () => {
+                setShowUnsavedModal(false);
+                await onSaveSettings();
+                if (pendingTab) {
+                  setActiveTab(pendingTab);
+                } else if (pendingNavAction) {
+                  navigation.dispatch(pendingNavAction);
+                } else if (pendingLogout) {
+                  logout();
+                }
+                setPendingTab(null);
+                setPendingLogout(false);
+                setPendingNavAction(null);
+              }}
             />
           </View>
         </View>
