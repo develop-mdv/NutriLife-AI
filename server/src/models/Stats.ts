@@ -7,6 +7,7 @@ export interface IDailyStats extends Document {
   steps: number;
   water: number;
   sleepHours: number;
+  sleepQuality: number;
 }
 
 const DailyStatsSchema = new Schema<IDailyStats>({
@@ -16,6 +17,7 @@ const DailyStatsSchema = new Schema<IDailyStats>({
   steps: { type: Number, default: 0 },
   water: { type: Number, default: 0 },
   sleepHours: { type: Number, default: 0 },
+  sleepQuality: { type: Number, default: 0 },
 });
 
 DailyStatsSchema.index({ userId: 1, date: 1 }, { unique: true });

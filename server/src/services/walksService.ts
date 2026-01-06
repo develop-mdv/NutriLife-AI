@@ -13,6 +13,50 @@ export interface WalkingRoute {
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
+// --- Reverse Geocoding для более точного определения адреса по координатам ---
+export const reverseGeocode = async (lat: number, lng: number): Promise<string | null> => {
+  try {
+    // Используем Nominatim (OpenStreetMap) - бесплатный сервис
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=ru&addressdetails=1`,
+      {
+        headers: {
+          'User-Agent': 'NutriLife-AI/1.0',
+        },
+      }
+    );
+    
+    if (!response.ok) return null;
+    
+    const data = await response.json();
+    if (!data || !data.address) return null;
+    
+    const addr = data.address;
+    const parts: string[] = [];
+    
+    // Собираем адрес из частей
+    if (addr.city || addr.town || addr.village || addr.state) {
+      parts.push(addr.city || addr.town || addr.village || addr.state);
+    }
+    if (addr.road) {
+      parts.push(addr.road);
+    }
+    if (addr.house_number) {
+      parts.push(addr.house_number);
+    }
+    
+    if (parts.length === 0) {
+      // Если не удалось собрать, вернём display_name
+      return data.display_name || null;
+    }
+    
+    return parts.join(', ');
+  } catch (e) {
+    console.error('reverseGeocode error', e);
+    return null;
+  }
+};
+
 // --- Address Validation ---
 export const validateAddress = async (input: string): Promise<string | null> => {
   try {
@@ -45,10 +89,18 @@ export const suggestWalkingRoutes = async (
     const halfTargetKm = targetKm / 2;
 
     let locationInstruction = '';
+    let resolvedAddress: string | null = null;
+
     if (mode === 'custom_address' && customAddress) {
       locationInstruction = `СТАРТОВАЯ ТОЧКА: Адрес "${customAddress}".`;
     } else if (lat && lng) {
-      locationInstruction = `СТАРТОВАЯ ТОЧКА: Координаты ${lat}, ${lng}.`;
+      // Попытаемся получить точный адрес по координатам
+      resolvedAddress = await reverseGeocode(lat, lng);
+      if (resolvedAddress) {
+        locationInstruction = `СТАРТОВАЯ ТОЧКА: Адрес "${resolvedAddress}" (координаты ${lat}, ${lng}).`;
+      } else {
+        locationInstruction = `СТАРТОВАЯ ТОЧКА: Координаты ${lat}, ${lng}.`;
+      }
     } else {
       locationInstruction = 'Местоположение неизвестно, используй центр Москвы.';
     }

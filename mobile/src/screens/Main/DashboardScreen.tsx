@@ -367,7 +367,10 @@ export const DashboardScreen: React.FC = () => {
               </View>
             </View>
             {settings?.sleep.wakeAlarmEnabled && (
-              <Text style={styles.sleepBadge}>⏰ {settings.sleep.wakeTime}</Text>
+              <View style={styles.sleepBadgeContainer}>
+                <Text style={styles.sleepBadge}>⏰</Text>
+                <Text style={styles.sleepBadgeTime}>{settings.sleep.wakeTime}</Text>
+              </View>
             )}
           </View>
           {stats.sleepHours > 0 ? (
@@ -576,60 +579,62 @@ export const DashboardScreen: React.FC = () => {
           onPress={() => setSelectedFood(null)}
         />
         <View style={styles.foodModalCard}>
-          {selectedFood.imageUri ? (
-            <Image source={{ uri: selectedFood.imageUri }} style={styles.foodModalImage} />
-          ) : (
-            <View style={[styles.foodModalImage, styles.foodModalImagePlaceholder]}>
-              <Text style={styles.foodModalPlaceholderEmoji}>🍽️</Text>
+          <ScrollView style={styles.foodModalScrollView} bounces={false}>
+            {selectedFood.imageUri ? (
+              <Image source={{ uri: selectedFood.imageUri }} style={styles.foodModalImage} />
+            ) : (
+              <View style={[styles.foodModalImage, styles.foodModalImagePlaceholder]}>
+                <Text style={styles.foodModalPlaceholderEmoji}>🍽️</Text>
+              </View>
+            )}
+
+            <View style={styles.foodModalContent}>
+              <Text style={styles.foodModalTitle}>{selectedFood.name}</Text>
+
+              <View style={styles.foodModalRatingRow}>
+                <View style={styles.foodModalRatingBadge}>
+                  <Text style={styles.foodModalRatingText}>★ {selectedFood.rating}/10</Text>
+                </View>
+                <Text style={styles.foodModalCaloriesText}>{Math.round(selectedFood.calories)} ккал</Text>
+              </View>
+
+              <View style={styles.foodModalMacrosRow}>
+                <View style={styles.foodModalMacroItem}>
+                  <Text style={styles.foodModalMacroValue}>{Math.round(selectedFood.protein)} г</Text>
+                  <Text style={styles.foodModalMacroLabel}>Белки</Text>
+                </View>
+                <View style={styles.foodModalMacroItem}>
+                  <Text style={styles.foodModalMacroValue}>{Math.round(selectedFood.fat)} г</Text>
+                  <Text style={styles.foodModalMacroLabel}>Жиры</Text>
+                </View>
+                <View style={styles.foodModalMacroItem}>
+                  <Text style={styles.foodModalMacroValue}>{Math.round(selectedFood.carbs)} г</Text>
+                  <Text style={styles.foodModalMacroLabel}>Углеводы</Text>
+                </View>
+              </View>
+
+              {selectedFood.recommendation ? (
+                <View style={styles.foodModalRecommendationBox}>
+                  <Text style={styles.foodModalRecommendationLabel}>💡 Комментарий ИИ</Text>
+                  <Text style={styles.foodModalRecommendationText}>{selectedFood.recommendation}</Text>
+                </View>
+              ) : null}
+
+              <Text style={styles.foodModalTimestamp}>
+                {new Date(
+                  typeof selectedFood.timestamp === 'number'
+                    ? selectedFood.timestamp
+                    : new Date(selectedFood.timestamp).getTime(),
+                ).toLocaleString([], {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </Text>
             </View>
-          )}
-
-          <View style={styles.foodModalContent}>
-            <Text style={styles.foodModalTitle}>{selectedFood.name}</Text>
-
-            <View style={styles.foodModalRatingRow}>
-              <View style={styles.foodModalRatingBadge}>
-                <Text style={styles.foodModalRatingText}>★ {selectedFood.rating}/10</Text>
-              </View>
-              <Text style={styles.foodModalCaloriesText}>{Math.round(selectedFood.calories)} ккал</Text>
-            </View>
-
-            <View style={styles.foodModalMacrosRow}>
-              <View style={styles.foodModalMacroItem}>
-                <Text style={styles.foodModalMacroValue}>{Math.round(selectedFood.protein)} г</Text>
-                <Text style={styles.foodModalMacroLabel}>Белки</Text>
-              </View>
-              <View style={styles.foodModalMacroItem}>
-                <Text style={styles.foodModalMacroValue}>{Math.round(selectedFood.fat)} г</Text>
-                <Text style={styles.foodModalMacroLabel}>Жиры</Text>
-              </View>
-              <View style={styles.foodModalMacroItem}>
-                <Text style={styles.foodModalMacroValue}>{Math.round(selectedFood.carbs)} г</Text>
-                <Text style={styles.foodModalMacroLabel}>Углеводы</Text>
-              </View>
-            </View>
-
-            {selectedFood.recommendation ? (
-              <View style={styles.foodModalRecommendationBox}>
-                <Text style={styles.foodModalRecommendationLabel}>💡 Комментарий ИИ</Text>
-                <Text style={styles.foodModalRecommendationText}>{selectedFood.recommendation}</Text>
-              </View>
-            ) : null}
-
-            <Text style={styles.foodModalTimestamp}>
-              {new Date(
-                typeof selectedFood.timestamp === 'number'
-                  ? selectedFood.timestamp
-                  : new Date(selectedFood.timestamp).getTime(),
-              ).toLocaleString([], {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </Text>
-          </View>
+          </ScrollView>
 
           <TouchableOpacity style={styles.foodModalCloseButton} onPress={() => setSelectedFood(null)}>
             <Text style={styles.foodModalCloseText}>Закрыть</Text>
@@ -856,9 +861,19 @@ const styles = StyleSheet.create({
     color: '#f97316',
     marginTop: 2,
   },
+  sleepBadgeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 1,
+  },
   sleepBadge: {
     fontSize: 12,
     color: '#4F46E5',
+  },
+  sleepBadgeTime: {
+    fontSize: 11,
+    color: '#4F46E5',
+    marginLeft: 2,
   },
   cardHeaderRowAlt: {
     flexDirection: 'row',
@@ -995,10 +1010,14 @@ const styles = StyleSheet.create({
   foodModalCard: {
     width: '100%',
     maxWidth: 360,
+    maxHeight: '85%',
     backgroundColor: '#ffffff',
     borderRadius: 20,
     overflow: 'hidden',
     elevation: 8,
+  },
+  foodModalScrollView: {
+    flexGrow: 0,
   },
   foodModalImage: {
     width: '100%',

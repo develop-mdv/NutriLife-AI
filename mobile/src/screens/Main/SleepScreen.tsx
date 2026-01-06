@@ -15,6 +15,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { MainStackParamList } from '../../navigation/MainStack';
 import {
   updateSleepToday,
+  updateSleepByDate,
   getSettings,
   updateSettings,
   getHistory,
@@ -31,11 +32,10 @@ export type SleepScreenProps = NativeStackScreenProps<MainStackParamList, 'Sleep
 
 type SleepTab = 'log' | 'settings' | 'tips';
 
-interface SleepEntryLocal {
-  id: string;
+interface SleepEntry {
+  date: string; // YYYY-MM-DD
   durationHours: number;
   quality: number;
-  timestamp: number;
 }
 
 export const SleepScreen: React.FC<SleepScreenProps> = ({ navigation }) => {
@@ -47,38 +47,39 @@ export const SleepScreen: React.FC<SleepScreenProps> = ({ navigation }) => {
   const [saving, setSaving] = useState(false);
 
   const [settings, setSettings] = useState<SettingsApi | null>(null);
-  const [sleepEntries, setSleepEntries] = useState<SleepEntryLocal[]>([]);
+  const [sleepEntries, setSleepEntries] = useState<SleepEntry[]>([]);
+  const [editingEntry, setEditingEntry] = useState<SleepEntry | null>(null);
+  const [editDuration, setEditDuration] = useState(7);
+  const [editQuality, setEditQuality] = useState(7);
+
+  const loadSleepData = async () => {
+    try {
+      const [s, h] = await Promise.all([
+        getSettings(),
+        getHistory(),
+      ]);
+      setSettings(s.data);
+      const lastStats: DailyStats[] = h.data || [];
+      const entries: SleepEntry[] = lastStats
+        .filter((d) => d.sleepHours && d.sleepHours > 0)
+        .map((d) => ({
+          date: d.date,
+          durationHours: d.sleepHours,
+          quality: d.sleepQuality || 7,
+        }));
+      setSleepEntries(entries);
+
+      // Проверяем, есть ли запись за сегодня
+      const today = new Date().toISOString().split('T')[0];
+      const hasToday = entries.some((e) => e.date === today);
+      setIsLoggedToday(hasToday);
+    } catch (e) {
+      console.log('Ошибка загрузки настроек/истории сна', e);
+    }
+  };
 
   useEffect(() => {
-    (async () => {
-      try {
-        const [s, h, localRaw] = await Promise.all([
-          getSettings(),
-          getHistory(),
-          AsyncStorage.getItem('sleepHistoryLocal'),
-        ]);
-        setSettings(s.data);
-        const lastStats: DailyStats[] = h.data || [];
-        const serverEntries: SleepEntryLocal[] = lastStats
-          .filter((d) => d.sleepHours && d.sleepHours > 0)
-          .map((d) => ({
-            id: d.date,
-            durationHours: d.sleepHours,
-            quality: 7,
-            timestamp: new Date(d.date).getTime(),
-          }));
-        const localEntries: SleepEntryLocal[] = localRaw ? JSON.parse(localRaw) : [];
-        const byKey = new Map<string, SleepEntryLocal>();
-        [...serverEntries, ...localEntries].forEach((e) => {
-          const key = new Date(e.timestamp).toISOString().split('T')[0];
-          byKey.set(key, e);
-        });
-        const combined = Array.from(byKey.values()).sort((a, b) => a.timestamp - b.timestamp);
-        setSleepEntries(combined);
-      } catch (e) {
-        console.log('Ошибка загрузки настроек/истории сна', e);
-      }
-    })();
+    loadSleepData();
   }, []);
 
   const onSaveLog = async () => {
@@ -89,23 +90,50 @@ export const SleepScreen: React.FC<SleepScreenProps> = ({ navigation }) => {
     }
     try {
       setSaving(true);
-      await updateSleepToday(h);
-      const entry: SleepEntryLocal = {
-        id: Date.now().toString(),
+      await updateSleepToday(h, quality);
+      const today = new Date().toISOString().split('T')[0];
+      const entry: SleepEntry = {
+        date: today,
         durationHours: h,
         quality,
-        timestamp: Date.now(),
       };
       setSleepEntries((prev) => {
-        const next = [...prev, entry];
-        AsyncStorage.setItem('sleepHistoryLocal', JSON.stringify(next)).catch(() => {});
-        return next;
+        const filtered = prev.filter((e) => e.date !== today);
+        return [...filtered, entry];
       });
       setIsLoggedToday(true);
       Alert.alert('Готово', 'Данные о сне сохранены');
     } catch (e) {
       console.log('Ошибка сохранения сна', e);
       Alert.alert('Ошибка', 'Не удалось сохранить данные');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const onEditEntry = (entry: SleepEntry) => {
+    setEditingEntry(entry);
+    setEditDuration(entry.durationHours);
+    setEditQuality(entry.quality);
+  };
+
+  const onSaveEdit = async () => {
+    if (!editingEntry) return;
+    try {
+      setSaving(true);
+      await updateSleepByDate(editingEntry.date, editDuration, editQuality);
+      setSleepEntries((prev) =>
+        prev.map((e) =>
+          e.date === editingEntry.date
+            ? { ...e, durationHours: editDuration, quality: editQuality }
+            : e
+        )
+      );
+      setEditingEntry(null);
+      Alert.alert('Готово', 'Запись обновлена');
+    } catch (e) {
+      console.log('Ошибка редактирования', e);
+      Alert.alert('Ошибка', 'Не удалось обновить запись');
     } finally {
       setSaving(false);
     }
@@ -192,8 +220,8 @@ export const SleepScreen: React.FC<SleepScreenProps> = ({ navigation }) => {
     });
   };
 
-  const lastFiveEntries = useMemo(
-    () => [...sleepEntries].sort((a, b) => b.timestamp - a.timestamp).slice(0, 5),
+  const sortedEntries = useMemo(
+    () => [...sleepEntries].sort((a, b) => b.date.localeCompare(a.date)),
     [sleepEntries],
   );
 
@@ -223,11 +251,13 @@ export const SleepScreen: React.FC<SleepScreenProps> = ({ navigation }) => {
     <SafeAreaView style={styles.safeContainer} edges={['top']}>
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 24 }}>
         <View style={styles.headerRow}>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={styles.title}>Сон и восстановление 🌙</Text>
             <Text style={styles.subtitle}>Качество сна влияет на все аспекты жизни</Text>
           </View>
-          <AppButton title="Закрыть" onPress={() => navigation.goBack()} />
+          <TouchableOpacity style={styles.closeIconButton} onPress={() => navigation.goBack()}>
+            <Text style={styles.closeIconText}>✕</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Tabs */}
@@ -344,32 +374,124 @@ export const SleepScreen: React.FC<SleepScreenProps> = ({ navigation }) => {
             {/* История сна */}
             <View style={styles.historySection}>
               <Text style={styles.historyTitle}>История сна</Text>
-              {lastFiveEntries.length === 0 ? (
+              {sortedEntries.length === 0 ? (
                 <Text style={styles.historyEmpty}>Нет записей</Text>
               ) : (
-                lastFiveEntries.map((e) => (
-                  <View key={e.id} style={styles.historyItem}>
+                sortedEntries.slice(0, 7).map((e) => (
+                  <TouchableOpacity
+                    key={e.date}
+                    style={styles.historyItem}
+                    activeOpacity={0.8}
+                    onPress={() => onEditEntry(e)}
+                  >
                     <View>
                       <Text style={styles.historyItemDuration}>{e.durationHours} часов</Text>
                       <Text style={styles.historyItemDate}>
-                        {new Date(e.timestamp).toLocaleDateString()}
+                        {new Date(e.date).toLocaleDateString('ru-RU', {
+                          day: 'numeric',
+                          month: 'short',
+                          weekday: 'short',
+                        })}
                       </Text>
                     </View>
-                    <View
-                      style={[
-                        styles.historyQualityBadge,
-                        e.quality >= 7
-                          ? styles.historyQualityGood
-                          : e.quality >= 5
-                          ? styles.historyQualityMedium
-                          : styles.historyQualityBad,
-                      ]}
-                    >
-                      <Text style={styles.historyQualityText}>Качество: {e.quality}</Text>
+                    <View style={styles.historyRightColumn}>
+                      <View
+                        style={[
+                          styles.historyQualityBadge,
+                          e.quality >= 7
+                            ? styles.historyQualityGood
+                            : e.quality >= 5
+                            ? styles.historyQualityMedium
+                            : styles.historyQualityBad,
+                        ]}
+                      >
+                        <Text style={styles.historyQualityText}>{e.quality}/10</Text>
+                      </View>
+                      <Text style={styles.historyEditHint}>Редактировать</Text>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 ))
               )}
+            </View>
+          </View>
+        )}
+
+        {/* Модальное окно редактирования */}
+        {editingEntry && (
+          <View style={styles.editModalOverlay}>
+            <View style={styles.editModalCard}>
+              <View style={styles.editModalHeader}>
+                <Text style={styles.editModalTitle}>
+                  Редактирование: {new Date(editingEntry.date).toLocaleDateString('ru-RU')}
+                </Text>
+                <TouchableOpacity onPress={() => setEditingEntry(null)}>
+                  <Text style={styles.editModalCloseText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.logBlock}>
+                <View style={styles.logLabelRow}>
+                  <Text style={styles.logLabel}>Длительность</Text>
+                  <Text style={styles.logValue}>{editDuration} ч.</Text>
+                </View>
+                <View style={styles.sliderRow}>
+                  <TextInput
+                    style={styles.sliderInput}
+                    keyboardType="numeric"
+                    value={String(editDuration)}
+                    onChangeText={(text) => {
+                      const v = Number(text.replace(',', '.'));
+                      if (!isNaN(v)) setEditDuration(Math.max(1, Math.min(24, v)));
+                    }}
+                  />
+                  <View style={styles.presetRow}>
+                    {[6, 7, 8].map((h) => (
+                      <TouchableOpacity
+                        key={h}
+                        style={styles.presetButton}
+                        onPress={() => setEditDuration(h)}
+                      >
+                        <Text style={styles.presetButtonText}>{h} ч</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.logBlock}>
+                <View style={styles.logLabelRow}>
+                  <Text style={styles.logLabel}>Качество (1–10)</Text>
+                  <Text style={styles.logValue}>{editQuality}/10</Text>
+                </View>
+                <View style={styles.qualityRow}>
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => (
+                    <TouchableOpacity
+                      key={v}
+                      style={[
+                        styles.qualityButton,
+                        editQuality === v && styles.qualityButtonActive,
+                      ]}
+                      activeOpacity={0.9}
+                      onPress={() => setEditQuality(v)}
+                    >
+                      <Text
+                        style={[
+                          styles.qualityButtonText,
+                          editQuality === v && styles.qualityButtonTextActive,
+                        ]}
+                      >
+                        {v}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <AppButton
+                title={saving ? 'Сохраняю...' : 'Сохранить'}
+                onPress={onSaveEdit}
+                disabled={saving}
+              />
             </View>
           </View>
         )}
@@ -517,8 +639,22 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 16,
+  },
+  closeIconButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#e5e7eb',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+  closeIconText: {
+    fontSize: 16,
+    color: '#6b7280',
+    fontWeight: '600',
   },
   title: {
     fontSize: 22,
@@ -737,6 +873,54 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: '#111827',
+  },
+  historyRightColumn: {
+    alignItems: 'flex-end',
+  },
+  historyEditHint: {
+    fontSize: 10,
+    color: '#9ca3af',
+    marginTop: 4,
+  },
+  // Edit Modal
+  editModalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  editModalCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    width: '100%',
+    maxWidth: 400,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+  },
+  editModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  editModalTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  editModalCloseText: {
+    fontSize: 20,
+    color: '#9ca3af',
+    fontWeight: '600',
   },
   // SETTINGS TAB
   settingsCard: {

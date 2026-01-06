@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,36 +8,100 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
+  TouchableOpacity,
+  Modal,
+  FlatList,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChatDaySummary, ChatMessage, getChatDays, getChatHistory, sendChatMessage } from '../../api/ai';
-import { AppButton } from '../../components/AppButton';
+
+const renderInlineFormatting = (text: string, isUser: boolean) => {
+  const baseStyle = isUser ? styles.textUser : styles.textModel;
+  const boldStyle = isUser ? styles.textUserBold : styles.textModelBold;
+  const segments = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+  return segments.map((seg, si) => {
+    if (seg.startsWith('**') && seg.endsWith('**') && seg.length > 4) {
+      return (
+        <Text key={si} style={boldStyle}>
+          {seg.slice(2, -2)}
+        </Text>
+      );
+    }
+    if (seg.startsWith('*') && seg.endsWith('*') && seg.length > 2) {
+      return (
+        <Text key={si} style={[baseStyle, { fontStyle: 'italic' }]}>
+          {seg.slice(1, -1)}
+        </Text>
+      );
+    }
+    return <Text key={si}>{seg}</Text>;
+  });
+};
 
 const renderMessageText = (text: string, isUser: boolean) => {
   const paragraphs = text.split(/\n{2,}/g);
+  const baseStyle = isUser ? styles.textUser : styles.textModel;
+
   return (
     <View>
       {paragraphs.map((para, pi) => {
         const lines = para.split('\n');
         return (
-          <View key={pi} style={pi > 0 ? { marginTop: 4 } : null}>
+          <View key={pi} style={pi > 0 ? { marginTop: 8 } : undefined}>
             {lines.map((line, li) => {
-              const baseStyle = isUser ? styles.textUser : styles.textModel;
-              const boldStyle = isUser ? styles.textUserBold : styles.textModelBold;
-              const segments = line.split(/(\*\*[^*]+\*\*)/g);
+              const h3Match = line.match(/^###\s+(.*)/);
+              if (h3Match) {
+                return (
+                  <Text key={li} style={[baseStyle, styles.h3]}>
+                    {renderInlineFormatting(h3Match[1], isUser)}
+                  </Text>
+                );
+              }
+              const h2Match = line.match(/^##\s+(.*)/);
+              if (h2Match) {
+                return (
+                  <Text key={li} style={[baseStyle, styles.h2]}>
+                    {renderInlineFormatting(h2Match[1], isUser)}
+                  </Text>
+                );
+              }
+              const h1Match = line.match(/^#\s+(.*)/);
+              if (h1Match) {
+                return (
+                  <Text key={li} style={[baseStyle, styles.h1]}>
+                    {renderInlineFormatting(h1Match[1], isUser)}
+                  </Text>
+                );
+              }
+
+              const numberedMatch = line.match(/^(\d+)\.\s+(.*)/);
+              if (numberedMatch) {
+                return (
+                  <View key={li} style={styles.listItem}>
+                    <Text style={[baseStyle, styles.listNumber]}>{numberedMatch[1]}.</Text>
+                    <Text style={[baseStyle, styles.listItemText]}>
+                      {renderInlineFormatting(numberedMatch[2], isUser)}
+                    </Text>
+                  </View>
+                );
+              }
+
+              const bulletMatch = line.match(/^[-*]\s+(.*)/);
+              if (bulletMatch) {
+                return (
+                  <View key={li} style={styles.listItem}>
+                    <Text style={[baseStyle, styles.bullet]}>•</Text>
+                    <Text style={[baseStyle, styles.listItemText]}>
+                      {renderInlineFormatting(bulletMatch[1], isUser)}
+                    </Text>
+                  </View>
+                );
+              }
+
               return (
                 <Text key={li} style={baseStyle}>
-                  {segments.map((seg, si) => {
-                    if (seg.startsWith('**') && seg.endsWith('**') && seg.length > 4) {
-                      const content = seg.slice(2, -2);
-                      return (
-                        <Text key={si} style={boldStyle}>
-                          {content}
-                        </Text>
-                      );
-                    }
-                    return <Text key={si}>{seg}</Text>;
-                  })}
+                  {renderInlineFormatting(line, isUser)}
                 </Text>
               );
             })}
@@ -56,29 +120,42 @@ export const ChatScreen: React.FC = () => {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [loadingDays, setLoadingDays] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
 
-  const formatDayLabel = (day: string) => {
+  const formatDayNice = (day: string) => {
     const today = new Date();
     const todayStr = today.toISOString().slice(0, 10);
     const d = new Date(day);
+    const months = [
+      'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+      'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря',
+    ];
+    const monthName = months[d.getMonth()];
+    const dateNum = d.getDate();
+
+    if (day === todayStr) {
+      return `Сегодня — ${dateNum} ${monthName}`;
+    }
+
     const yesterday = new Date(today);
     yesterday.setDate(today.getDate() - 1);
     const yesterdayStr = yesterday.toISOString().slice(0, 10);
 
-    if (day === todayStr) return 'Сегодня';
-    if (day === yesterdayStr) return 'Вчера';
-    const dd = d.getDate().toString().padStart(2, '0');
-    const mm = (d.getMonth() + 1).toString().padStart(2, '0');
-    return `${dd}.${mm}`;
+    if (day === yesterdayStr) {
+      return `Вчера — ${dateNum} ${monthName}`;
+    }
+
+    return `${dateNum} ${monthName}`;
   };
 
   const ensureGreetingIfEmpty = (day: string, items: ChatMessage[]): ChatMessage[] => {
     if (items.length > 0) return items;
-    const label = formatDayLabel(day);
+    const d = new Date(day);
+    const dateStr = `${d.getDate()}.${(d.getMonth() + 1).toString().padStart(2, '0')}`;
     return [
       {
         role: 'model',
-        text: `Привет! Это чат с твоим ИИ-тренером за ${label.toLowerCase()}. Задай мне вопрос или попроси скорректировать план.`,
+        text: `Привет! Это чат за ${dateStr}. Чем могу помочь?`,
       },
     ];
   };
@@ -98,7 +175,6 @@ export const ChatScreen: React.FC = () => {
     }
   };
 
-  // При открытии экрана подгружаем список дней и историю за последний день
   useEffect(() => {
     (async () => {
       setLoadingDays(true);
@@ -131,11 +207,9 @@ export const ChatScreen: React.FC = () => {
     setLoading(true);
 
     try {
-      // Передаём только сообщения текущего дня как историю для модели
       const res = await sendChatMessage(messages, text);
       const rawText = res.data.text;
 
-      // Обработка тега [UPDATE_PLAN: ...] как в веб-версии
       const updateMatch = rawText.match(/\[UPDATE_PLAN:\s*(.*?)\]/);
       let displayText = rawText;
 
@@ -183,6 +257,9 @@ export const ChatScreen: React.FC = () => {
     }
   };
 
+  const selectedDaySummary = days.find((d) => d.day === selectedDay);
+  const messageCount = selectedDaySummary ? selectedDaySummary.count : messages.length;
+
   return (
     <SafeAreaView style={styles.safeContainer} edges={['top']}>
       <KeyboardAvoidingView
@@ -190,85 +267,126 @@ export const ChatScreen: React.FC = () => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
       >
-      <View style={styles.header}>
-        <Text style={styles.title}>Ассистент</Text>
-        <Text style={styles.subtitle}>Твой ИИ-тренер по питанию, сну и активности</Text>
-      </View>
+        <View style={styles.headerRow}>
+          <View style={styles.headerTextBlock}>
+            <Text style={styles.title}>Ассистент</Text>
+            <Text style={styles.subtitle}>Твой ИИ-тренер по питанию, сну и активности</Text>
+          </View>
+          <TouchableOpacity onPress={() => setShowHistoryModal(true)}>
+            <Text style={styles.headerHistoryLink}>История</Text>
+          </TouchableOpacity>
+        </View>
 
-      {/* Переключатель дневных чатов за неделю */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.daysRow}
-      >
-        {selectedDay && (
-          <>
-            {[selectedDay, ...days.filter((d) => d.day !== selectedDay).map((d) => d.day)]
-              .filter((v, idx, arr) => arr.indexOf(v) === idx)
-              .slice(0, 7)
-              .map((day) => {
-                const isActive = day === selectedDay;
-                const summary = days.find((d) => d.day === day);
-                return (
-                  <AppButton
-                    key={day}
-                    title={summary ? `${formatDayLabel(day)}` : formatDayLabel(day)}
-                    onPress={() => {
-                      if (day === selectedDay) return;
-                      setSelectedDay(day);
-                      loadHistoryForDay(day);
-                    }}
-                    style={[
-                      styles.dayChip,
-                      isActive && styles.dayChipActive,
-                    ]}
-                  />
-                );
-              })}
-          </>
-        )}
-      </ScrollView>
+        <ScrollView
+          style={styles.messages}
+          contentContainerStyle={{ paddingTop: 12, paddingBottom: 16, flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+        >
+          {messages.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateIcon}>💬</Text>
+              <Text style={styles.emptyStateTitle}>Чат очищен</Text>
+              <Text style={styles.emptyStateText}>
+                Чат очищен, история перенесена в архив. В следующем сообщении можете начать новый разговор.
+              </Text>
+            </View>
+          ) : (
+            messages.map((m, idx) => (
+              <View
+                key={idx}
+                style={[
+                  styles.bubble,
+                  m.role === 'user' ? styles.bubbleUser : styles.bubbleModel,
+                ]}
+              >
+                {renderMessageText(m.text, m.role === 'user')}
+              </View>
+            ))
+          )}
+          {loadingHistory && (
+            <View style={[styles.bubble, styles.bubbleModel]}>
+              <ActivityIndicator />
+            </View>
+          )}
+          {loading && (
+            <View style={[styles.bubble, styles.bubbleModel]}>
+              <ActivityIndicator />
+            </View>
+          )}
+        </ScrollView>
 
-      <ScrollView
-        style={styles.messages}
-        contentContainerStyle={{ paddingTop: 4, paddingBottom: 16, flexGrow: 1 }}
-        keyboardShouldPersistTaps="handled"
-      >
-        {messages.map((m, idx) => (
-          <View
-            key={idx}
-            style={[
-              styles.bubble,
-              m.role === 'user' ? styles.bubbleUser : styles.bubbleModel,
-            ]}
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.inputField}
+            value={input}
+            onChangeText={setInput}
+            placeholder="Напишите сообщение..."
+            placeholderTextColor="#9ca3af"
+            multiline
+          />
+          <TouchableOpacity
+            style={[styles.sendButton, (!input.trim() || loading) && styles.sendButtonDisabled]}
+            onPress={onSend}
+            disabled={loading || !input.trim()}
           >
-            {renderMessageText(m.text, m.role === 'user')}
-          </View>
-        ))}
-        {loadingHistory && (
-          <View style={[styles.bubble, styles.bubbleModel]}>
-            <ActivityIndicator />
-          </View>
-        )}
-        {loading && (
-          <View style={[styles.bubble, styles.bubbleModel]}>
-            <ActivityIndicator />
-          </View>
-        )}
-      </ScrollView>
+            <Text style={styles.sendButtonArrow}>➤</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
 
-      <View style={styles.inputRow}>
-        <TextInput
-          style={styles.input}
-          value={input}
-          onChangeText={setInput}
-          placeholder="Напишите сообщение..."
-          multiline
-        />
-        <AppButton title="▶" onPress={onSend} disabled={loading} />
-      </View>
-    </KeyboardAvoidingView>
-  </SafeAreaView>
+      <Modal
+        visible={showHistoryModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowHistoryModal(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setShowHistoryModal(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>История чатов</Text>
+                  <TouchableOpacity onPress={() => setShowHistoryModal(false)}>
+                    <Text style={styles.modalClose}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+                <FlatList
+                  data={days}
+                  keyExtractor={(item) => item.day}
+                  style={{ maxHeight: 300 }}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={[
+                        styles.modalItem,
+                        selectedDay === item.day && styles.modalItemActive,
+                      ]}
+                      onPress={() => {
+                        setSelectedDay(item.day);
+                        loadHistoryForDay(item.day);
+                        setShowHistoryModal(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.modalItemText,
+                          selectedDay === item.day && styles.modalItemTextActive,
+                        ]}
+                      >
+                        {formatDayNice(item.day)}
+                      </Text>
+                      <View style={styles.modalItemRight}>
+                        <Text style={styles.modalItemCount}>{item.count} сообщ.</Text>
+                        {selectedDay === item.day && <Text style={styles.modalItemCheck}>✓</Text>}
+                      </View>
+                    </TouchableOpacity>
+                  )}
+                />
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+    </SafeAreaView>
   );
 };
 
@@ -279,87 +397,228 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    padding: 12,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 8,
   },
-  header: {
-    marginBottom: 8,
-  },
-  daysRow: {
+  headerRow: {
     flexDirection: 'row',
-    paddingVertical: 4,
-    marginHorizontal: -4,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
   },
-  dayChip: {
-    marginHorizontal: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#d4d4d8',
-    backgroundColor: '#ffffff',
-  },
-  dayChipActive: {
-    backgroundColor: '#4ade80',
-    borderColor: '#22c55e',
+  headerTextBlock: {
+    flexShrink: 1,
+    paddingRight: 12,
   },
   title: {
-    fontSize: 22,
-    fontWeight: 'bold',
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#1f2937',
   },
   subtitle: {
-    color: '#555',
+    fontSize: 14,
+    color: '#6b7280',
     marginTop: 4,
+  },
+  headerHistoryLink: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
   },
   messages: {
     flex: 1,
-    marginVertical: 8,
+    marginBottom: 12,
+  },
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  emptyStateIcon: {
+    fontSize: 40,
+    marginBottom: 12,
+  },
+  emptyStateTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 8,
+  },
+  emptyStateText: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
   },
   bubble: {
-    marginVertical: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16,
+    marginVertical: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 20,
     maxWidth: '85%',
   },
   bubbleUser: {
-    backgroundColor: '#4ade80',
+    backgroundColor: '#dcfce7',
     alignSelf: 'flex-end',
+    borderBottomRightRadius: 4,
   },
   bubbleModel: {
     backgroundColor: '#ffffff',
     alignSelf: 'flex-start',
+    borderBottomLeftRadius: 4,
     borderWidth: 1,
     borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+    elevation: 1,
   },
   textUser: {
-    color: '#06281e',
-    fontSize: 14,
+    color: '#064e3b',
+    fontSize: 15,
   },
   textModel: {
-    color: '#111827',
-    fontSize: 14,
+    color: '#1f2937',
+    fontSize: 15,
+    lineHeight: 22,
   },
   textUserBold: {
     fontWeight: '700',
+    color: '#064e3b',
   },
   textModelBold: {
     fontWeight: '700',
+    color: '#111827',
   },
-  inputRow: {
+  h1: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  h2: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  h3: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  listItem: {
+    flexDirection: 'row',
+    paddingLeft: 4,
+    marginTop: 4,
+  },
+  bullet: {
+    width: 16,
+    marginRight: 4,
+  },
+  listNumber: {
+    width: 20,
+    marginRight: 4,
+    fontWeight: '600',
+  },
+  listItemText: {
+    flex: 1,
+    lineHeight: 22,
+  },
+  inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderTopWidth: 1,
-    borderColor: '#e5e7eb',
-    paddingTop: 8,
+    gap: 8,
   },
-  input: {
+  inputField: {
     flex: 1,
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: '#d4d4d8',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginRight: 8,
-    maxHeight: 80,
+    borderColor: '#e5e7eb',
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    fontSize: 15,
+    maxHeight: 100,
+    color: '#111827',
+  },
+  sendButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#10b981',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendButtonDisabled: {
+    backgroundColor: '#d1fae5',
+  },
+  sendButtonArrow: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '700',
+    marginLeft: 2,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    maxHeight: '70%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  modalClose: {
+    fontSize: 24,
+    color: '#9ca3af',
+  },
+  modalItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  modalItemActive: {
+    backgroundColor: '#f0fdf4',
+    marginHorizontal: -20,
+    paddingHorizontal: 20,
+  },
+  modalItemText: {
+    fontSize: 16,
+    color: '#374151',
+  },
+  modalItemTextActive: {
+    fontWeight: '600',
+    color: '#15803d',
+  },
+  modalItemRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  modalItemCount: {
+    fontSize: 13,
+    color: '#9ca3af',
+  },
+  modalItemCheck: {
+    fontSize: 16,
+    color: '#15803d',
+    fontWeight: 'bold',
   },
 });

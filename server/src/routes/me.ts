@@ -132,10 +132,28 @@ meRouter.put('/water/today', async (req: AuthedRequest, res) => {
 });
 
 meRouter.put('/sleep/today', async (req: AuthedRequest, res) => {
-  const { sleepHours } = req.body;
+  const { sleepHours, sleepQuality } = req.body;
+  const updateFields: any = {};
+  if (sleepHours !== undefined) updateFields.sleepHours = sleepHours;
+  if (sleepQuality !== undefined) updateFields.sleepQuality = sleepQuality;
   const stats = await DailyStats.findOneAndUpdate(
     { userId: req.userId, date: todayStr() },
-    { $set: { sleepHours } },
+    { $set: updateFields },
+    { upsert: true, new: true },
+  );
+  res.json(stats);
+});
+
+// Обновить сон за конкретный день (для редактирования истории)
+meRouter.put('/sleep/:date', async (req: AuthedRequest, res) => {
+  const { date } = req.params;
+  const { sleepHours, sleepQuality } = req.body;
+  const updateFields: any = {};
+  if (sleepHours !== undefined) updateFields.sleepHours = sleepHours;
+  if (sleepQuality !== undefined) updateFields.sleepQuality = sleepQuality;
+  const stats = await DailyStats.findOneAndUpdate(
+    { userId: req.userId, date },
+    { $set: updateFields },
     { upsert: true, new: true },
   );
   res.json(stats);

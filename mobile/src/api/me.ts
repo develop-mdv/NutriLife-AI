@@ -6,6 +6,7 @@ export interface DailyStats {
   steps: number;
   water: number;
   sleepHours: number;
+  sleepQuality: number;
 }
 
 export type Gender = 'male' | 'female' | 'other';
@@ -78,7 +79,10 @@ export const updateTodayStats = (data: Partial<DailyStats>) =>
 
 export const updateStepsToday = (steps: number) => api.put('/me/steps/today', { steps });
 export const updateWaterToday = (water: number) => api.put('/me/water/today', { water });
-export const updateSleepToday = (sleepHours: number) => api.put('/me/sleep/today', { sleepHours });
+export const updateSleepToday = (sleepHours: number, sleepQuality?: number) =>
+  api.put('/me/sleep/today', { sleepHours, sleepQuality });
+export const updateSleepByDate = (date: string, sleepHours: number, sleepQuality?: number) =>
+  api.put(`/me/sleep/${date}`, { sleepHours, sleepQuality });
 
 export const getHistory = () => api.get<DailyStats[]>('/me/stats/history');
 

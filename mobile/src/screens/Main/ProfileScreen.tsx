@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import Svg, { Rect } from 'react-native-svg';
+import Svg, { Rect, Text as SvgText } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppButton } from '../../components/AppButton';
 import { useAuth } from '../../context/AuthContext';
@@ -599,11 +599,25 @@ export const ProfileScreen: React.FC = () => {
                   <View style={styles.historyChartsWrapper}>
                     {/* Калории по дням */}
                     <View style={styles.historyChartBox}>
-                      <Text style={styles.historyChartTitle}>Калории по дням</Text>
+                      <View style={styles.historyChartHeader}>
+                        <Text style={styles.historyChartTitle}>Калории по дням</Text>
+                        {selectedCalorieIndex != null &&
+                          filteredHistory[selectedCalorieIndex] && (
+                            <View style={styles.historyChartTooltipBadge}>
+                              <Text style={styles.historyChartTooltipDate}>
+                                {formatShortDate(filteredHistory[selectedCalorieIndex].date)}
+                              </Text>
+                              <Text style={styles.historyChartTooltipValue}>
+                                {filteredHistory[selectedCalorieIndex].calories} ккал
+                              </Text>
+                            </View>
+                          )}
+                      </View>
                       {(() => {
-                        const barWidth = 10;
-                        const barGap = 6;
-                        const maxHeight = 70;
+                        const barWidth = 28;
+                        const barGap = 8;
+                        const maxHeight = 80;
+                        const labelHeight = 20;
                         const maxValue = Math.max(
                           ...filteredHistory.map((d) => d.calories || 0),
                           1,
@@ -611,47 +625,73 @@ export const ProfileScreen: React.FC = () => {
                         const chartWidth =
                           filteredHistory.length * (barWidth + barGap) + barGap;
                         return (
-                          <View style={styles.historyChartSvgWrapper}>
-                            <Svg width={chartWidth} height={maxHeight + 10}>
-                              {filteredHistory.map((d, index) => {
-                                const value = d.calories || 0;
-                                const barHeight = (value / maxValue) * maxHeight;
-                                const x = index * (barWidth + barGap) + barGap;
-                                const y = maxHeight - barHeight;
-                                const isSelected = index === selectedCalorieIndex;
-                                return (
-                                  <Rect
-                                    key={d.date || index}
-                                    x={x}
-                                    y={y}
-                                    width={barWidth}
-                                    height={barHeight}
-                                    rx={3}
-                                    fill={isSelected ? '#22c55e' : '#34d399'}
-                                    onPress={() => setSelectedCalorieIndex(index)}
-                                  />
-                                );
-                              })}
-                            </Svg>
-                          </View>
+                          <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            style={styles.historyChartScroll}
+                            contentContainerStyle={{ paddingHorizontal: 4 }}
+                          >
+                            <View style={styles.historyChartContainer}>
+                              <Svg width={chartWidth} height={maxHeight + labelHeight}>
+                                {filteredHistory.map((d, index) => {
+                                  const value = d.calories || 0;
+                                  const barHeight = Math.max((value / maxValue) * maxHeight, 4);
+                                  const x = index * (barWidth + barGap) + barGap;
+                                  const y = maxHeight - barHeight;
+                                  const isSelected = index === selectedCalorieIndex;
+                                  const dateStr = d.date ? new Date(d.date).getDate().toString() : '';
+                                  return (
+                                    <React.Fragment key={d.date || index}>
+                                      <Rect
+                                        x={x}
+                                        y={isSelected ? y - 4 : y}
+                                        width={barWidth}
+                                        height={isSelected ? barHeight + 4 : barHeight}
+                                        rx={6}
+                                        fill={isSelected ? '#15803d' : '#34d399'}
+                                        onPress={() => setSelectedCalorieIndex(index)}
+                                      />
+                                      <SvgText
+                                        x={x + barWidth / 2}
+                                        y={maxHeight + 14}
+                                        fontSize={10}
+                                        fill={isSelected ? '#111827' : '#9ca3af'}
+                                        fontWeight={isSelected ? 'bold' : 'normal'}
+                                        textAnchor="middle"
+                                      >
+                                        {dateStr}
+                                      </SvgText>
+                                    </React.Fragment>
+                                  );
+                                })}
+                              </Svg>
+                            </View>
+                          </ScrollView>
                         );
                       })()}
-                      {selectedCalorieIndex != null &&
-                        filteredHistory[selectedCalorieIndex] && (
-                          <Text style={styles.historyChartTooltip}>
-                            {formatShortDate(filteredHistory[selectedCalorieIndex].date)} ·{' '}
-                            {filteredHistory[selectedCalorieIndex].calories} ккал
-                          </Text>
-                        )}
                     </View>
 
                     {/* Шаги по дням */}
                     <View style={styles.historyChartBox}>
-                      <Text style={styles.historyChartTitle}>Шаги по дням</Text>
+                      <View style={styles.historyChartHeader}>
+                        <Text style={styles.historyChartTitle}>Шаги по дням</Text>
+                        {selectedStepsIndex != null &&
+                          filteredHistory[selectedStepsIndex] && (
+                            <View style={[styles.historyChartTooltipBadge, { backgroundColor: '#fef2f2' }]}>
+                              <Text style={styles.historyChartTooltipDate}>
+                                {formatShortDate(filteredHistory[selectedStepsIndex].date)}
+                              </Text>
+                              <Text style={[styles.historyChartTooltipValue, { color: '#dc2626' }]}>
+                                {filteredHistory[selectedStepsIndex].steps} шагов
+                              </Text>
+                            </View>
+                          )}
+                      </View>
                       {(() => {
-                        const barWidth = 10;
-                        const barGap = 6;
-                        const maxHeight = 70;
+                        const barWidth = 28;
+                        const barGap = 8;
+                        const maxHeight = 80;
+                        const labelHeight = 20;
                         const maxValue = Math.max(
                           ...filteredHistory.map((d) => d.steps || 0),
                           1,
@@ -659,38 +699,50 @@ export const ProfileScreen: React.FC = () => {
                         const chartWidth =
                           filteredHistory.length * (barWidth + barGap) + barGap;
                         return (
-                          <View style={styles.historyChartSvgWrapper}>
-                            <Svg width={chartWidth} height={maxHeight + 10}>
-                              {filteredHistory.map((d, index) => {
-                                const value = d.steps || 0;
-                                const barHeight = (value / maxValue) * maxHeight;
-                                const x = index * (barWidth + barGap) + barGap;
-                                const y = maxHeight - barHeight;
-                                const isSelected = index === selectedStepsIndex;
-                                return (
-                                  <Rect
-                                    key={d.date || index}
-                                    x={x}
-                                    y={y}
-                                    width={barWidth}
-                                    height={barHeight}
-                                    rx={3}
-                                    fill={isSelected ? '#f97373' : '#ef4444'}
-                                    onPress={() => setSelectedStepsIndex(index)}
-                                  />
-                                );
-                              })}
-                            </Svg>
-                          </View>
+                          <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            style={styles.historyChartScroll}
+                            contentContainerStyle={{ paddingHorizontal: 4 }}
+                          >
+                            <View style={styles.historyChartContainer}>
+                              <Svg width={chartWidth} height={maxHeight + labelHeight}>
+                                {filteredHistory.map((d, index) => {
+                                  const value = d.steps || 0;
+                                  const barHeight = Math.max((value / maxValue) * maxHeight, 4);
+                                  const x = index * (barWidth + barGap) + barGap;
+                                  const y = maxHeight - barHeight;
+                                  const isSelected = index === selectedStepsIndex;
+                                  const dateStr = d.date ? new Date(d.date).getDate().toString() : '';
+                                  return (
+                                    <React.Fragment key={d.date || index}>
+                                      <Rect
+                                        x={x}
+                                        y={isSelected ? y - 4 : y}
+                                        width={barWidth}
+                                        height={isSelected ? barHeight + 4 : barHeight}
+                                        rx={6}
+                                        fill={isSelected ? '#b91c1c' : '#ef4444'}
+                                        onPress={() => setSelectedStepsIndex(index)}
+                                      />
+                                      <SvgText
+                                        x={x + barWidth / 2}
+                                        y={maxHeight + 14}
+                                        fontSize={10}
+                                        fill={isSelected ? '#111827' : '#9ca3af'}
+                                        fontWeight={isSelected ? 'bold' : 'normal'}
+                                        textAnchor="middle"
+                                      >
+                                        {dateStr}
+                                      </SvgText>
+                                    </React.Fragment>
+                                  );
+                                })}
+                              </Svg>
+                            </View>
+                          </ScrollView>
                         );
                       })()}
-                      {selectedStepsIndex != null &&
-                        filteredHistory[selectedStepsIndex] && (
-                          <Text style={styles.historyChartTooltip}>
-                            {formatShortDate(filteredHistory[selectedStepsIndex].date)} ·{' '}
-                            {filteredHistory[selectedStepsIndex].steps} шагов
-                          </Text>
-                        )}
                     </View>
                   </View>
                 )}
@@ -1152,7 +1204,10 @@ export const ProfileScreen: React.FC = () => {
             <AppButton title="Отмена" onPress={() => setIsAdjustingPlan(false)} />
             <AppButton
               title={generatingPlan ? 'Обновляю...' : 'Обновить план'}
-              onPress={() => onGeneratePlan(true)}
+              onPress={() => {
+                setIsAdjustingPlan(false);
+                onGeneratePlan(true);
+              }}
               disabled={generatingPlan}
             />
           </View>
@@ -1505,24 +1560,50 @@ const styles = StyleSheet.create({
     color: '#6b7280',
   },
   historyChartsWrapper: {
-    marginTop: 12,
+    marginTop: 16,
   },
   historyChartBox: {
-    marginTop: 8,
+    marginTop: 12,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  historyChartHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   historyChartTitle: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
     color: '#374151',
-    marginBottom: 4,
   },
-  historyChartSvgWrapper: {
-    marginTop: 2,
-  },
-  historyChartTooltip: {
+  historyChartScroll: {
     marginTop: 4,
+  },
+  historyChartContainer: {
+    paddingBottom: 4,
+  },
+  historyChartTooltipBadge: {
+    backgroundColor: '#ecfdf5',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  historyChartTooltipDate: {
     fontSize: 11,
-    color: '#4b5563',
+    color: '#6b7280',
+    marginRight: 6,
+  },
+  historyChartTooltipValue: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#15803d',
   },
   achievementsGrid: {
     flexDirection: 'row',
