@@ -59,11 +59,11 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigat
                 // вместо прямого перехода отдаём действие экрану профиля,
                 // чтобы он показал модалку и потом выполнил этот переход
                 const navAction = CommonActions.navigate({ name: route.name });
-                navigation.navigate('Profile' as never, {
+                (navigation as any).navigate('Profile', {
                   profilePendingNavAction: navAction,
-                } as never);
+                });
               } else {
-                navigation.navigate(route.name as never);
+                (navigation as any).navigate(route.name);
               }
             }
           };
@@ -84,7 +84,6 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigat
               accessibilityRole="button"
               accessibilityState={isFocused ? { selected: true } : {}}
               accessibilityLabel={options.tabBarAccessibilityLabel}
-              testID={options.tabBarTestID}
               onPress={onPress}
               onLongPress={onLongPress}
               style={[stylesTab.tabItem, isNearCenter && stylesTab.tabItemWithSpacer]}

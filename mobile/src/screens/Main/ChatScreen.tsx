@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -113,6 +113,7 @@ const renderMessageText = (text: string, isUser: boolean) => {
 };
 
 export const ChatScreen: React.FC = () => {
+  const scrollRef = useRef<ScrollView | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -174,6 +175,15 @@ export const ChatScreen: React.FC = () => {
       setLoadingHistory(false);
     }
   };
+
+  // автоскролл при изменении количества сообщений
+  useEffect(() => {
+    if (scrollRef.current) {
+      requestAnimationFrame(() => {
+        scrollRef.current?.scrollToEnd({ animated: true });
+      });
+    }
+  }, [messages.length]);
 
   useEffect(() => {
     (async () => {
@@ -278,9 +288,15 @@ export const ChatScreen: React.FC = () => {
         </View>
 
         <ScrollView
+          ref={scrollRef}
           style={styles.messages}
           contentContainerStyle={{ paddingTop: 12, paddingBottom: 16, flexGrow: 1 }}
           keyboardShouldPersistTaps="handled"
+          onContentSizeChange={() => {
+            if (scrollRef.current) {
+              scrollRef.current.scrollToEnd({ animated: true });
+            }
+          }}
         >
           {messages.length === 0 ? (
             <View style={styles.emptyState}>

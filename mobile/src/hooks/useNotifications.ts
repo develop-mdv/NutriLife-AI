@@ -39,8 +39,14 @@ export const useNotificationsSetup = () => {
 };
 
 // ----- Вода -----
+// Планируем ТОЛЬКО ОДНО повторяющееся напоминание о воде.
+// Перед созданием нового сначала удаляем все старые water_interval-уведомления,
+// чтобы не было "спам-атаки" из-за дублирующихся расписаний.
 export const scheduleWaterReminder = async (intervalMinutes: number) => {
   try {
+    // На всякий случай очищаем старые расписания воды
+    await cancelWaterReminders();
+
     await Notifications.scheduleNotificationAsync({
       content: {
         title: 'Время пить воду 💧',

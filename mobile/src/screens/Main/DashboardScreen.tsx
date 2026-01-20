@@ -72,14 +72,11 @@ export const DashboardScreen: React.FC = () => {
     loadProfileAndSettings();
   }, [loadProfileAndSettings]);
 
-  const onEnableWaterReminders = async () => {
-    await scheduleWaterReminder(120); // legacy helper, оставлен для совместимости, но основное управление через onToggleWaterReminders
-  };
-
   const onToggleWaterReminders = async () => {
     try {
       const next = !waterRemindersEnabled;
       if (next) {
+        // Планируем одно повторяющееся напоминание каждые 2 часа
         await scheduleWaterReminder(120);
       } else {
         await cancelWaterReminders();
@@ -114,12 +111,12 @@ export const DashboardScreen: React.FC = () => {
 
   const macroGoals = useMemo(() => {
     const cals = calorieGoal;
-    let ratio = { p: 0.25, f: 0.25, c: 0.5 } as const;
+    let ratio = { p: 0.25, f: 0.25, c: 0.5 };
 
     if (profile?.goal === 'lose_weight') {
-      ratio = { p: 0.4, f: 0.3, c: 0.3 } as const;
+      ratio = { p: 0.4, f: 0.3, c: 0.3 };
     } else if (profile?.goal === 'gain_muscle') {
-      ratio = { p: 0.3, f: 0.2, c: 0.5 } as const;
+      ratio = { p: 0.3, f: 0.2, c: 0.5 };
     }
 
     return {
@@ -326,7 +323,7 @@ export const DashboardScreen: React.FC = () => {
                   waterRemindersEnabled && styles.cardBellActive,
                 ]}
               >
-                🔔
+                {waterRemindersEnabled ? '🔔' : '🔕'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -340,9 +337,7 @@ export const DashboardScreen: React.FC = () => {
             <View style={{ width: 8 }} />
             <AppButton title="+500" onPress={() => addWater(500)} />
           </View>
-          <View style={{ marginTop: 8 }}>
-            <AppButton title="Напоминания" onPress={onEnableWaterReminders} />
-          </View>
+          {/* Кнопка "Напоминания" больше не нужна — управление только через иконку-колокольчик */}
         </View>
 
         <View style={[styles.cardSmall, { flex: 1, marginLeft: 8 }] }>

@@ -11,7 +11,7 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import Svg, { Rect, Text as SvgText } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppButton } from '../../components/AppButton';
@@ -128,6 +128,20 @@ export const ProfileScreen: React.FC = () => {
     })();
   }, []);
 
+  // Синхронизация состояния напоминаний о воде при фокусе экрана
+  useFocusEffect(
+    React.useCallback(() => {
+      (async () => {
+        try {
+          const waterFlag = await AsyncStorage.getItem('waterRemindersEnabled');
+          setWaterRemindersEnabled(waterFlag === 'true');
+        } catch (e) {
+          console.log('Ошибка синхронизации состояния напоминаний о воде', e);
+        }
+      })();
+    }, []),
+  );
+
   const onSaveSettings = async () => {
     if (!profile || !settings) return;
     setSaving(true);
@@ -137,8 +151,9 @@ export const ProfileScreen: React.FC = () => {
         updateSettings(settings),
       ]);
       setHasUnsavedChanges(false);
-      // после сохранения актуализируем план под новые данные
-      await onGeneratePlan(false);
+      // План больше не пересчитываем автоматически при любом изменении настроек,
+      // чтобы изменения будильников и напоминаний не трогали "Мой план".
+      // Обновление плана остаётся через экран "Мой план" и явные действия пользователя.
     } catch (e) {
       console.log('Ошибка сохранения профиля/настроек', e);
     } finally {
@@ -438,9 +453,15 @@ export const ProfileScreen: React.FC = () => {
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 24 }}>
       {/* Header Card */}
       <View style={styles.headerCard}>
-        <View style={styles.avatarCircle}>
-          <Text style={styles.avatarText}>{(profile.name || user?.name || 'N')[0]?.toUpperCase()}</Text>
-        </View>
+        <TouchableOpacity
+          style={styles.avatarCircle}
+          activeOpacity={0.8}
+          onPress={() => setShowGoalPicker(true)}
+        >
+          <Text style={styles.avatarText}>
+            {profile.avatarEmoji || (profile.name || user?.name || 'N')[0]?.toUpperCase()}
+          </Text>
+        </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={styles.name}>{profile.name || user?.name}</Text>
           {user?.email ? <Text style={styles.email}>{user.email}</Text> : null}
@@ -1176,7 +1197,7 @@ export const ProfileScreen: React.FC = () => {
         </>
       )}
 
-      <View style={{ marginTop: 24 }}>
+      <View style={{ marginTop: 16 }}>
         <AppButton title="Выйти" onPress={requestLogout} />
       </View>
     </ScrollView>
@@ -1281,8 +1302,9 @@ export const ProfileScreen: React.FC = () => {
           onPress={() => setShowGoalPicker(false)}
         />
         <View style={styles.goalOverlayCard}>
-          <Text style={styles.goalOverlayTitle}>Выбор цели</Text>
+          <Text style={styles.goalOverlayTitle}>Выбор цели и аватара</Text>
           <Text style={styles.goalOverlaySubtitle}>Это поможет скорректировать рекомендации и план.</Text>
+          {/* Блок выбора цели */}
           {[
             { id: 'lose_weight', label: 'Похудение', description: 'Снижение веса с акцентом на дефицит калорий и активность.' },
             { id: 'gain_muscle', label: 'Набор массы', description: 'Умеренный профицит калорий и повышенный белок для роста мышц.' },
@@ -1314,11 +1336,36 @@ export const ProfileScreen: React.FC = () => {
               }}
             >
               <View style={{ flex: 1 }}>
-                <Text style={styles.goalOptionTitle}>{option.label}</Text>
+                <Text style={styles.goalOptionLabel}>{option.label}</Text>
                 <Text style={styles.goalOptionDescription}>{option.description}</Text>
               </View>
             </TouchableOpacity>
           ))}
+          {/* Блок выбора аватара-emoji */}
+          <View style={{ marginTop: 12 }}>
+            <Text style={[styles.goalOverlaySubtitle, { marginBottom: 8 }]}>Выберите аватар:</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' }}>
+              {['🧑‍💻', '🏃‍♂️', '🏃‍♀️', '💪', '🥦', '🧘‍♀️', '🚴‍♂️', '🌞'].map((emoji) => (
+                <TouchableOpacity
+                  key={emoji}
+                  style={{
+                    padding: 8,
+                    margin: 4,
+                    borderRadius: 999,
+                    borderWidth: profile.avatarEmoji === emoji ? 2 : 1,
+                    borderColor: profile.avatarEmoji === emoji ? '#22c55e' : '#e5e7eb',
+                  }}
+                  onPress={() => {
+                    const updated: UserProfileApi = { ...profile, avatarEmoji: emoji };
+                    setProfile(updated);
+                    setHasUnsavedChanges(true);
+                  }}
+                >
+                  <Text style={{ fontSize: 24 }}>{emoji}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
           <View style={{ marginTop: 12 }}>
             <AppButton title="Закрыть" onPress={() => setShowGoalPicker(false)} />
           </View>
@@ -1914,21 +1961,24 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     marginBottom: 10,
     backgroundColor: '#f3f4f6',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
   goalOptionRowActive: {
-    backgroundColor: '#ecfdf5',
-    borderWidth: 1,
-    borderColor: '#34d399',
+    backgroundColor: '#dcfce7',
+    borderWidth: 2,
+    borderColor: '#22c55e',
   },
   goalOptionLabel: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '700',
     color: '#111827',
     marginBottom: 4,
   },
   goalOptionDescription: {
     fontSize: 13,
-    color: '#4b5563',
+    color: '#374151',
+    lineHeight: 18,
   },
   achievementOverlayCard: {
     width: '100%',

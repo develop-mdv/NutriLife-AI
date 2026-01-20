@@ -26,6 +26,8 @@ export interface UserProfileApi {
   allergies?: string;
   preferences?: string;
   healthConditions?: string;
+  // Простой аватар в виде emoji-иконки (хранится на сервере вместе с профилем)
+  avatarEmoji?: string;
 }
 
 export interface ReminderConfigApi {

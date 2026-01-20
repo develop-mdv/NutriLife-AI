@@ -7,6 +7,7 @@ const emptyStats: DailyStats = {
   steps: 0,
   water: 0,
   sleepHours: 0,
+  sleepQuality: 0,
 };
 
 export const useTodayStats = () => {
