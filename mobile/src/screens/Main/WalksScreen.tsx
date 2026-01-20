@@ -6,6 +6,7 @@ import * as Location from 'expo-location';
 import { useTodayStats } from '../../hooks/useTodayStats';
 import { getProfile, UserProfileApi } from '../../api/me';
 import { suggestWalks, validateWalkAddress, WalkingRouteApi, WalkMode } from '../../api/walks';
+import { Colors } from '../../constants/Colors';
 
 interface ProgressBarProps {
   current: number;
@@ -213,7 +214,7 @@ export const WalksScreen: React.FC = () => {
               {stepGoal > 0 ? Math.round((today.steps / stepGoal) * 100) : 0}%
             </Text>
           </View>
-          <ProgressBar current={today.steps} max={stepGoal} color="#22c55e" />
+          <ProgressBar current={today.steps} max={stepGoal} color={Colors.primary} />
           <Text style={styles.progressText}>
             Осталось: <Text style={styles.progressTextBold}>{stepsNeeded > 0 ? stepsNeeded : 0} шагов</Text> (~
             {approxKm.toFixed(1)} км).
@@ -249,6 +250,7 @@ export const WalksScreen: React.FC = () => {
               <TextInput
                 style={styles.addressInput}
                 placeholder="Введите адрес (дом, офис...)"
+                placeholderTextColor={Colors.textDim}
                 value={customAddress}
                 onChangeText={(text) => {
                   setCustomAddress(text);
@@ -262,7 +264,7 @@ export const WalksScreen: React.FC = () => {
                 disabled={!customAddress || isVerifying}
                 onPress={handleVerifyAddress}
               >
-                {isVerifying ? <ActivityIndicator size="small" color="#047857" /> : <Text style={styles.verifyButtonText}>Проверить</Text>}
+                {isVerifying ? <ActivityIndicator size="small" color={Colors.primary} /> : <Text style={styles.verifyButtonText}>Проверить</Text>}
               </TouchableOpacity>
             </View>
             {verifiedAddress && (
@@ -297,7 +299,7 @@ export const WalksScreen: React.FC = () => {
 
         {loading && !locError && (
           <View style={styles.loadingBox}>
-            <ActivityIndicator />
+            <ActivityIndicator color={Colors.primary} />
             <Text style={styles.loadingText}>
               {activeTab === 'nearby'
                 ? 'Ищу парки и зелёные зоны поблизости...'
@@ -360,7 +362,7 @@ export const WalksScreen: React.FC = () => {
 const styles = StyleSheet.create({
   safeContainer: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.background,
   },
   container: {
     flex: 1,
@@ -375,10 +377,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#111827',
+    color: Colors.textPrimary,
   },
   subtitle: {
-    color: '#6b7280',
+    color: Colors.textSecondary,
     marginTop: 2,
     fontSize: 13,
   },
@@ -388,17 +390,19 @@ const styles = StyleSheet.create({
   headerStepsValue: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#22c55e',
+    color: Colors.primary,
   },
   headerStepsLabel: {
     fontSize: 11,
-    color: '#6b7280',
+    color: Colors.textSecondary,
   },
   progressCard: {
-    backgroundColor: '#ecfdf5',
+    backgroundColor: Colors.card,
     borderRadius: 16,
     padding: 14,
     marginBottom: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   progressHeaderRow: {
     flexDirection: 'row',
@@ -408,18 +412,18 @@ const styles = StyleSheet.create({
   },
   progressTitle: {
     fontSize: 13,
-    color: '#047857',
+    color: Colors.textPrimary,
     fontWeight: '600',
   },
   progressPercent: {
     fontSize: 13,
-    color: '#047857',
+    color: Colors.primary,
     fontWeight: '600',
   },
   progressOuter: {
     height: 8,
     borderRadius: 999,
-    backgroundColor: '#d1fae5',
+    backgroundColor: '#333333', // Dark track
     overflow: 'hidden',
   },
   progressInner: {
@@ -429,14 +433,15 @@ const styles = StyleSheet.create({
   progressText: {
     marginTop: 6,
     fontSize: 12,
-    color: '#047857',
+    color: Colors.textSecondary,
   },
   progressTextBold: {
     fontWeight: '700',
+    color: Colors.textPrimary,
   },
   tabsRow: {
     flexDirection: 'row',
-    backgroundColor: '#e5e7eb',
+    backgroundColor: Colors.border,
     borderRadius: 999,
     padding: 4,
     marginBottom: 8,
@@ -448,15 +453,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tabButtonActive: {
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.card,
   },
   tabText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#6b7280',
+    color: Colors.textDim,
   },
   tabTextActive: {
-    color: '#111827',
+    color: Colors.textPrimary,
   },
   addressBlock: {
     marginTop: 8,
@@ -470,18 +475,21 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: Colors.border,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.card,
     marginRight: 8,
     fontSize: 14,
+    color: Colors.textPrimary,
   },
   verifyButton: {
     paddingHorizontal: 12,
     paddingVertical: 9,
     borderRadius: 12,
-    backgroundColor: '#dcfce7',
+    backgroundColor: 'rgba(16, 185, 129, 0.2)', // Primary with opacity
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.4)',
   },
   verifyButtonDisabled: {
     opacity: 0.5,
@@ -489,28 +497,28 @@ const styles = StyleSheet.create({
   verifyButtonText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#047857',
+    color: Colors.primary,
   },
   addressVerifiedBox: {
     marginTop: 6,
     borderRadius: 12,
     padding: 8,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
     borderWidth: 1,
-    borderColor: '#bbf7d0',
+    borderColor: Colors.primary,
   },
   addressVerifiedLabel: {
     fontSize: 11,
-    color: '#6b7280',
+    color: Colors.textSecondary,
   },
   addressVerifiedValue: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#111827',
+    color: Colors.textPrimary,
   },
   modeHint: {
     fontSize: 12,
-    color: '#6b7280',
+    color: Colors.textSecondary,
     marginTop: 4,
     marginBottom: 8,
   },
@@ -518,10 +526,12 @@ const styles = StyleSheet.create({
     marginTop: 8,
     padding: 10,
     borderRadius: 10,
-    backgroundColor: '#fee2e2',
+    backgroundColor: 'rgba(239, 68, 68, 0.2)', // Red with opacity
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.4)',
   },
   warningText: {
-    color: '#b91c1c',
+    color: '#F87171', // Lighter red for dark theme
     fontSize: 12,
   },
   loadingBox: {
@@ -531,22 +541,22 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 8,
     fontSize: 12,
-    color: '#6b7280',
+    color: Colors.textSecondary,
     textAlign: 'center',
   },
   routesTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
+    color: Colors.textPrimary,
     marginBottom: 8,
   },
   routeCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.card,
     borderRadius: 16,
     padding: 14,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: Colors.border,
   },
   routeHeaderRow: {
     flexDirection: 'row',
@@ -558,14 +568,14 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     fontWeight: '600',
-    color: '#111827',
+    color: Colors.textPrimary,
     marginRight: 8,
   },
   routeDistance: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#2563eb',
-    backgroundColor: '#eff6ff',
+    color: Colors.info,
+    backgroundColor: 'rgba(59, 130, 246, 0.15)',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 999,
@@ -583,16 +593,16 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   routeBadgeRound: {
-    backgroundColor: '#f5f3ff',
-    color: '#6d28d9',
+    backgroundColor: 'rgba(139, 92, 246, 0.2)', // Purple opacity
+    color: '#A78BFA',
   },
   routeBadgeOneWay: {
-    backgroundColor: '#f3f4f6',
-    color: '#4b5563',
+    backgroundColor: Colors.border,
+    color: Colors.textSecondary,
   },
   routeDescription: {
     fontSize: 13,
-    color: '#4b5563',
+    color: Colors.textSecondary,
     marginTop: 4,
   },
   routeMetaRow: {
@@ -600,7 +610,7 @@ const styles = StyleSheet.create({
   },
   routeMetaItem: {
     fontSize: 11,
-    color: '#6b7280',
+    color: Colors.textDim,
     marginTop: 2,
   },
   routeButtonsRow: {

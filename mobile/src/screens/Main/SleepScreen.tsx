@@ -27,6 +27,7 @@ import {
   cancelSleepNotifications,
   SleepNotificationType,
 } from '../../hooks/useNotifications';
+import { Colors } from '../../constants/Colors';
 
 export type SleepScreenProps = NativeStackScreenProps<MainStackParamList, 'Sleep'>;
 
@@ -318,6 +319,7 @@ export const SleepScreen: React.FC<SleepScreenProps> = ({ navigation }) => {
                         const v = Number(text.replace(',', '.'));
                         if (!isNaN(v)) setDuration(Math.max(3, Math.min(12, v)));
                       }}
+                      placeholderTextColor={Colors.textDim}
                     />
                     <View style={styles.presetRow}>
                       {[6, 7, 8].map((h) => (
@@ -401,8 +403,8 @@ export const SleepScreen: React.FC<SleepScreenProps> = ({ navigation }) => {
                           e.quality >= 7
                             ? styles.historyQualityGood
                             : e.quality >= 5
-                            ? styles.historyQualityMedium
-                            : styles.historyQualityBad,
+                              ? styles.historyQualityMedium
+                              : styles.historyQualityBad,
                         ]}
                       >
                         <Text style={styles.historyQualityText}>{e.quality}/10</Text>
@@ -443,6 +445,7 @@ export const SleepScreen: React.FC<SleepScreenProps> = ({ navigation }) => {
                       const v = Number(text.replace(',', '.'));
                       if (!isNaN(v)) setEditDuration(Math.max(1, Math.min(24, v)));
                     }}
+                    placeholderTextColor={Colors.textDim}
                   />
                   <View style={styles.presetRow}>
                     {[6, 7, 8].map((h) => (
@@ -503,7 +506,7 @@ export const SleepScreen: React.FC<SleepScreenProps> = ({ navigation }) => {
             <View style={styles.settingsCard}>
               <View style={styles.settingsHeaderRow}>
                 <View style={styles.settingsIconRow}>
-                  <View style={[styles.settingsIconCircle, { backgroundColor: '#e0e7ff' }] }>
+                  <View style={[styles.settingsIconCircle, { backgroundColor: 'rgba(59, 130, 246, 0.2)' }]}>
                     <Text style={styles.settingsIconEmoji}>⏰</Text>
                   </View>
                   <View>
@@ -536,6 +539,7 @@ export const SleepScreen: React.FC<SleepScreenProps> = ({ navigation }) => {
                   style={styles.timeInput}
                   value={settings.sleep.wakeTime}
                   onChangeText={onChangeWakeTime}
+                  placeholderTextColor={Colors.textDim}
                 />
                 <Text style={styles.timeHint}>время подъёма</Text>
               </View>
@@ -548,7 +552,7 @@ export const SleepScreen: React.FC<SleepScreenProps> = ({ navigation }) => {
             <View style={styles.settingsCard}>
               <View style={styles.settingsHeaderRow}>
                 <View style={styles.settingsIconRow}>
-                  <View style={[styles.settingsIconCircle, { backgroundColor: '#f3e8ff' }] }>
+                  <View style={[styles.settingsIconCircle, { backgroundColor: 'rgba(139, 92, 246, 0.2)' }]}>
                     <Text style={styles.settingsIconEmoji}>🌙</Text>
                   </View>
                   <View>
@@ -581,6 +585,7 @@ export const SleepScreen: React.FC<SleepScreenProps> = ({ navigation }) => {
                   style={styles.timeInput}
                   value={settings.sleep.bedTime}
                   onChangeText={onChangeBedTime}
+                  placeholderTextColor={Colors.textDim}
                 />
                 <Text style={styles.timeHint}>время отбоя</Text>
               </View>
@@ -595,6 +600,7 @@ export const SleepScreen: React.FC<SleepScreenProps> = ({ navigation }) => {
                   keyboardType="numeric"
                   value={String(settings.sleep.targetHours ?? '')}
                   onChangeText={onChangeTargetHours}
+                  placeholderTextColor={Colors.textDim}
                 />
                 <Text style={styles.timeHint}>часов / ночь</Text>
               </View>
@@ -630,7 +636,7 @@ export const SleepScreen: React.FC<SleepScreenProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   safeContainer: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: Colors.background,
   },
   container: {
     flex: 1,
@@ -646,28 +652,30 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#e5e7eb',
+    backgroundColor: Colors.card,
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   closeIconText: {
     fontSize: 16,
-    color: '#6b7280',
+    color: Colors.textSecondary,
     fontWeight: '600',
   },
   title: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#312e81',
+    color: Colors.textPrimary,
   },
   subtitle: {
-    color: '#6b7280',
+    color: Colors.textSecondary,
     marginTop: 4,
   },
   tabsContainer: {
     flexDirection: 'row',
-    backgroundColor: '#e0e7ff',
+    backgroundColor: Colors.border,
     borderRadius: 999,
     padding: 4,
     marginBottom: 16,
@@ -679,32 +687,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tabButtonActive: {
-    backgroundColor: '#ffffff',
-    elevation: 2,
+    backgroundColor: Colors.card,
   },
   tabText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#4f46e5',
+    color: Colors.textDim,
   },
   tabTextActive: {
-    color: '#1f2937',
+    color: Colors.textPrimary,
   },
   section: {
     marginTop: 4,
   },
   // LOG TAB
   logCard: {
-    backgroundColor: '#eef2ff',
+    backgroundColor: Colors.card,
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#c7d2fe',
+    borderColor: Colors.border,
   },
   logTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#312e81',
+    color: Colors.textPrimary,
     marginBottom: 12,
   },
   logBlock: {
@@ -718,13 +725,13 @@ const styles = StyleSheet.create({
   logLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#312e81',
+    color: Colors.textSecondary,
     textTransform: 'uppercase',
   },
   logValue: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#4f46e5',
+    color: Colors.primary,
   },
   sliderRow: {
     flexDirection: 'row',
@@ -735,13 +742,13 @@ const styles = StyleSheet.create({
     width: 70,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#c7d2fe',
+    borderColor: Colors.border,
     paddingVertical: 6,
     paddingHorizontal: 8,
-    backgroundColor: '#eef2ff',
+    backgroundColor: Colors.background,
     textAlign: 'center',
     fontWeight: '600',
-    color: '#1f2937',
+    color: Colors.textPrimary,
     marginRight: 8,
   },
   presetRow: {
@@ -754,13 +761,15 @@ const styles = StyleSheet.create({
     marginHorizontal: 2,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.background,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   presetButtonText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#4f46e5',
+    color: Colors.textSecondary,
   },
   qualityRow: {
     flexDirection: 'row',
@@ -772,115 +781,118 @@ const styles = StyleSheet.create({
     minWidth: 28,
     paddingVertical: 6,
     borderRadius: 10,
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.background,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   qualityButtonActive: {
-    backgroundColor: '#4f46e5',
-    elevation: 2,
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
   },
   qualityButtonText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#9ca3af',
+    color: Colors.textSecondary,
   },
   qualityButtonTextActive: {
-    color: '#ffffff',
+    color: '#000000', // Black on neon green
   },
   successCard: {
-    backgroundColor: '#dcfce7',
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
     borderRadius: 16,
     padding: 20,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#bbf7d0',
+    borderColor: Colors.primary,
     marginBottom: 16,
   },
   successIconCircle: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#bbf7d0',
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
   },
   successIcon: {
     fontSize: 32,
-    color: '#15803d',
+    color: '#000000',
   },
   successTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
-    color: '#166534',
+    color: Colors.textPrimary,
+    marginBottom: 4,
   },
   successSubtitle: {
-    marginTop: 4,
     fontSize: 14,
-    color: '#16a34a',
+    color: Colors.textSecondary,
+    textAlign: 'center',
   },
   historySection: {
-    marginTop: 16,
+    marginTop: 24,
   },
   historyTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
-    marginBottom: 8,
-    color: '#111827',
+    color: Colors.textPrimary,
+    marginBottom: 12,
   },
   historyEmpty: {
-    fontSize: 13,
-    color: '#9ca3af',
-    textAlign: 'center',
-    paddingVertical: 8,
+    color: Colors.textDim,
+    fontSize: 14,
+    fontStyle: 'italic',
   },
   historyItem: {
-    backgroundColor: '#ffffff',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: Colors.card,
     borderRadius: 12,
     padding: 12,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    borderColor: Colors.border,
   },
   historyItemDuration: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
+    color: Colors.textPrimary,
   },
   historyItemDate: {
-    fontSize: 11,
-    color: '#9ca3af',
+    fontSize: 12,
+    color: Colors.textDim,
     marginTop: 2,
-  },
-  historyQualityBadge: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  historyQualityGood: {
-    backgroundColor: '#dcfce7',
-  },
-  historyQualityMedium: {
-    backgroundColor: '#fef9c3',
-  },
-  historyQualityBad: {
-    backgroundColor: '#fee2e2',
-  },
-  historyQualityText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#111827',
   },
   historyRightColumn: {
     alignItems: 'flex-end',
   },
+  historyQualityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginBottom: 4,
+    backgroundColor: Colors.background,
+  },
+  historyQualityText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+  },
+  historyQualityGood: {
+    // borderLeftWidth: 3, borderLeftColor: '#16a34a' 
+  },
+  historyQualityMedium: {
+    // borderLeftWidth: 3, borderLeftColor: '#f59e0b'
+  },
+  historyQualityBad: {
+    // borderLeftWidth: 3, borderLeftColor: '#ef4444'
+  },
   historyEditHint: {
     fontSize: 10,
-    color: '#9ca3af',
-    marginTop: 4,
+    color: Colors.primary,
   },
   // Edit Modal
   editModalOverlay: {
@@ -889,22 +901,16 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.8)',
     justifyContent: 'center',
-    alignItems: 'center',
     padding: 16,
   },
   editModalCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 16,
-    width: '100%',
-    maxWidth: 400,
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
+    backgroundColor: Colors.card,
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   editModalHeader: {
     flexDirection: 'row',
@@ -914,158 +920,157 @@ const styles = StyleSheet.create({
   },
   editModalTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
+    fontWeight: '700',
+    color: Colors.textPrimary,
   },
   editModalCloseText: {
-    fontSize: 20,
-    color: '#9ca3af',
-    fontWeight: '600',
+    fontSize: 24,
+    color: Colors.textDim,
+    lineHeight: 24,
   },
   // SETTINGS TAB
   settingsCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.card,
     borderRadius: 16,
     padding: 16,
-    marginBottom: 12,
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: Colors.border,
   },
   settingsHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 16,
   },
   settingsIconRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
   },
   settingsIconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 8,
   },
   settingsIconEmoji: {
-    fontSize: 18,
+    fontSize: 20,
   },
   settingsTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#111827',
+    color: Colors.textPrimary,
   },
   settingsSubtitle: {
-    fontSize: 11,
-    color: '#6b7280',
+    fontSize: 12,
+    color: Colors.textSecondary,
   },
   switch: {
-    paddingLeft: 8,
+    padding: 4,
   },
   switchTrack: {
-    width: 46,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: '#e5e7eb',
+    width: 44,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: Colors.border,
     justifyContent: 'center',
-    paddingHorizontal: 3,
+    paddingHorizontal: 2,
   },
   switchTrackOn: {
-    backgroundColor: '#4f46e5',
+    backgroundColor: Colors.info,
   },
   switchTrackOnPurple: {
-    backgroundColor: '#7e22ce',
+    backgroundColor: '#8b5cf6',
   },
   switchThumb: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: '#ffffff',
-    alignSelf: 'flex-start',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#fff',
   },
   switchThumbOn: {
     alignSelf: 'flex-end',
   },
   timeRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
+    alignItems: 'baseline',
+    gap: 8,
   },
   timeInput: {
-    fontSize: 24,
+    fontSize: 32,
     fontWeight: '700',
-    color: '#111827',
+    color: Colors.textPrimary,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-    paddingVertical: 4,
-    paddingRight: 8,
-    minWidth: 80,
+    borderBottomColor: Colors.border,
+    paddingVertical: 0,
+    minWidth: 100,
   },
   timeHint: {
-    fontSize: 12,
-    color: '#9ca3af',
-    marginLeft: 8,
+    fontSize: 14,
+    color: Colors.textDim,
   },
   settingsFootnote: {
-    fontSize: 10,
-    color: '#9ca3af',
-    marginTop: 6,
+    fontSize: 11,
+    color: Colors.textDim,
+    marginTop: 12,
+    fontStyle: 'italic',
   },
   goalLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#6b7280',
-    textTransform: 'uppercase',
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+    marginBottom: 8,
   },
   goalRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 6,
+    alignItems: 'baseline',
+    gap: 8,
   },
   goalInput: {
-    width: 80,
-    backgroundColor: '#f3f4f6',
-    borderRadius: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    textAlign: 'center',
-    fontSize: 18,
+    fontSize: 32,
     fontWeight: '700',
-    color: '#111827',
+    color: Colors.textPrimary,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    paddingVertical: 0,
+    minWidth: 60,
+    textAlign: 'center',
   },
   // TIPS TAB
   tipCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.card,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: Colors.border,
   },
   tipTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#3730a3',
-    marginBottom: 4,
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    marginBottom: 6,
   },
   tipText: {
-    fontSize: 13,
-    color: '#4b5563',
+    fontSize: 14,
+    color: Colors.textSecondary,
+    lineHeight: 20,
   },
   tipChatCard: {
-    marginTop: 4,
-    padding: 14,
+    marginTop: 8,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
     borderRadius: 16,
-    backgroundColor: '#e0e7ff',
+    padding: 16,
+    alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#c7d2fe',
+    borderColor: Colors.primary,
   },
   tipChatText: {
-    fontSize: 13,
-    color: '#4338ca',
-    textAlign: 'center',
+    fontSize: 14,
     fontWeight: '600',
+    color: Colors.primary,
+    textAlign: 'center',
   },
 });

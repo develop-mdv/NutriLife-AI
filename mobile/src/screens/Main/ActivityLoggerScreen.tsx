@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { MainStackParamList } from '../../navigation/MainStack';
 import { getProfile, getTodayStats, updateTodayStats } from '../../api/me';
+import { Colors } from '../../constants/Colors';
 
 export type ActivityLoggerScreenProps = NativeStackScreenProps<
   MainStackParamList,
@@ -175,6 +176,7 @@ export const ActivityLoggerScreen: React.FC<ActivityLoggerScreenProps> = ({ navi
                 keyboardType="numeric"
                 value={durationMinutes}
                 onChangeText={setDurationMinutes}
+                placeholderTextColor={Colors.textDim}
               />
               <View style={styles.durationPresetsRow}>
                 {[20, 30, 45].map((m) => (
@@ -201,6 +203,7 @@ export const ActivityLoggerScreen: React.FC<ActivityLoggerScreenProps> = ({ navi
               keyboardType="numeric"
               value={calories}
               onChangeText={setCalories}
+              placeholderTextColor="rgba(234, 88, 12, 0.5)"
             />
           </View>
           <View style={styles.caloriesHintBadge}>
@@ -234,7 +237,7 @@ export const ActivityLoggerScreen: React.FC<ActivityLoggerScreenProps> = ({ navi
 const styles = StyleSheet.create({
   safeContainer: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: Colors.background,
   },
   container: {
     flex: 1,
@@ -247,12 +250,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#111827',
+    color: Colors.textPrimary,
   },
   subtitle: {
     marginTop: 4,
     fontSize: 13,
-    color: '#6b7280',
+    color: Colors.textSecondary,
   },
   activitiesGrid: {
     flexDirection: 'row',
@@ -263,41 +266,41 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 10,
     borderRadius: 12,
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.card,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: Colors.border,
     marginRight: 8,
     marginBottom: 8,
   },
   activityButtonActive: {
-    borderColor: '#22c55e',
-    backgroundColor: '#dcfce7',
+    borderColor: Colors.primary,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
   },
   activityButtonText: {
     fontSize: 13,
-    color: '#4b5563',
+    color: Colors.textSecondary,
     fontWeight: '500',
   },
   activityButtonTextActive: {
-    color: '#16a34a',
+    color: Colors.primary,
   },
   card: {
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.card,
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: Colors.border,
     marginBottom: 16,
   },
   label: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#6b7280',
+    color: Colors.textSecondary,
     textTransform: 'uppercase',
   },
   intensityRow: {
     flexDirection: 'row',
-    backgroundColor: '#f3f4f6',
+    backgroundColor: Colors.background, // Inner background
     borderRadius: 10,
     padding: 2,
     marginTop: 8,
@@ -309,15 +312,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   intensityButtonActive: {
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.card, // Highlighted
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
   },
   intensityButtonText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#9ca3af',
+    color: Colors.textDim,
   },
   intensityButtonTextActive: {
-    color: '#111827',
+    color: Colors.textPrimary,
   },
   durationRow: {
     flexDirection: 'row',
@@ -328,12 +335,13 @@ const styles = StyleSheet.create({
     width: 70,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: Colors.border,
     paddingVertical: 6,
     paddingHorizontal: 8,
     textAlign: 'center',
     fontWeight: '600',
-    color: '#111827',
+    color: Colors.textPrimary,
+    backgroundColor: Colors.background,
     marginRight: 8,
   },
   durationPresetsRow: {
@@ -346,37 +354,39 @@ const styles = StyleSheet.create({
     marginHorizontal: 2,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: Colors.background,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   durationPresetText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#4b5563',
+    color: Colors.textSecondary,
   },
   caloriesCard: {
-    backgroundColor: '#fff7ed',
+    backgroundColor: 'rgba(234, 88, 12, 0.1)', // Orange tint
     borderRadius: 20,
     padding: 20,
     borderWidth: 1,
-    borderColor: '#fed7aa',
+    borderColor: 'rgba(234, 88, 12, 0.3)',
     marginBottom: 16,
     alignItems: 'center',
     position: 'relative',
   },
   caloriesLabel: {
     fontSize: 13,
-    color: '#ea580c',
+    color: Colors.secondary,
     marginBottom: 4,
   },
   caloriesInput: {
     fontSize: 32,
     fontWeight: '700',
-    color: '#111827',
+    color: Colors.textPrimary,
     textAlign: 'center',
     minWidth: 80,
     borderBottomWidth: 1,
-    borderBottomColor: '#fed7aa',
+    borderBottomColor: 'rgba(234, 88, 12, 0.3)',
     paddingVertical: 4,
   },
   caloriesHintBadge: {
@@ -386,12 +396,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 999,
-    backgroundColor: '#fffbeb',
+    backgroundColor: 'rgba(234, 88, 12, 0.2)',
   },
   caloriesHintText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#f97316',
+    color: Colors.secondary,
   },
   buttonsRow: {
     flexDirection: 'row',
@@ -405,22 +415,22 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     marginRight: 8,
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.card,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: Colors.border,
   },
   cancelButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#6b7280',
+    color: Colors.textSecondary,
   },
   saveButton: {
     marginLeft: 8,
-    backgroundColor: '#f97316',
+    backgroundColor: Colors.primary,
   },
   saveButtonText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#ffffff',
+    color: '#000000', // Black text on neon green
   },
 });

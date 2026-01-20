@@ -26,7 +26,8 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigat
   };
 
   return (
-    <View style={[stylesTab.container, { paddingBottom: Math.max(insets.bottom, 8) }] }>
+
+    <View style={[stylesTab.container, { paddingBottom: Math.max(insets.bottom, 8) }]}>
       <View style={stylesTab.innerRow}>
         {state.routes.map((route, index) => {
           const { options } = descriptors[route.key];
@@ -34,8 +35,8 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigat
             typeof options.tabBarLabel === 'string'
               ? options.tabBarLabel
               : options.title !== undefined
-              ? options.title
-              : route.name;
+                ? options.title
+                : route.name;
 
           const isFocused = state.index === index;
 
@@ -103,8 +104,10 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigat
 
       {/* Центральная кнопка + как на веб-версии */}
       <View style={stylesTab.plusWrapper}>
-        <TouchableOpacity style={stylesTab.plusButton} onPress={handlePlusPress} activeOpacity={0.9}>
-          <Text style={stylesTab.plusText}>+</Text>
+        <TouchableOpacity style={stylesTab.plusButtonShadow} onPress={handlePlusPress} activeOpacity={0.9}>
+          <View style={stylesTab.plusButton}>
+            <Text style={stylesTab.plusText}>+</Text>
+          </View>
         </TouchableOpacity>
       </View>
     </View>
@@ -127,16 +130,16 @@ export const MainTabs: React.FC = () => {
 
 const stylesTab = StyleSheet.create({
   container: {
-    backgroundColor: 'rgba(255,255,255,0.95)',
+    backgroundColor: '#18181b', // Zinc-900
     borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
+    borderTopColor: '#27272a',
   },
   innerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
     paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingTop: 12, // more breathing room
   },
   tabItem: {
     flex: 1,
@@ -150,26 +153,39 @@ const stylesTab = StyleSheet.create({
     marginHorizontal: 12,
   },
   icon: {
-    fontSize: 20,
-    color: '#9ca3af',
-    marginBottom: 2,
+    fontSize: 22,
+    color: '#6b7280',
+    marginBottom: 4,
   },
   iconActive: {
     color: '#10b981',
+    textShadowColor: 'rgba(16, 185, 129, 0.4)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
   },
   label: {
     fontSize: 10,
     color: '#6b7280',
   },
   labelActive: {
-    color: '#111827',
+    color: '#f3f4f6', // bright white-ish
     fontWeight: '600',
   },
   plusWrapper: {
     position: 'absolute',
     left: '50%',
     transform: [{ translateX: -32 }],
-    top: -20,
+    top: -24,
+  },
+  plusButtonShadow: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    elevation: 8,
+    shadowColor: '#10b981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
   },
   plusButton: {
     width: 64,
@@ -179,12 +195,12 @@ const stylesTab = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 4,
-    borderColor: '#f9fafb',
-    elevation: 4,
+    borderColor: '#18181b', // matches tab bar bg
   },
   plusText: {
     fontSize: 32,
     color: '#ffffff',
     marginTop: -2,
+    fontWeight: '300',
   },
 });

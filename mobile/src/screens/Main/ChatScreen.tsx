@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChatDaySummary, ChatMessage, getChatDays, getChatHistory, sendChatMessage } from '../../api/ai';
+import { Colors } from '../../constants/Colors';
 
 const renderInlineFormatting = (text: string, isUser: boolean) => {
   const baseStyle = isUser ? styles.textUser : styles.textModel;
@@ -321,12 +322,12 @@ export const ChatScreen: React.FC = () => {
           )}
           {loadingHistory && (
             <View style={[styles.bubble, styles.bubbleModel]}>
-              <ActivityIndicator />
+              <ActivityIndicator color={Colors.primary} />
             </View>
           )}
           {loading && (
             <View style={[styles.bubble, styles.bubbleModel]}>
-              <ActivityIndicator />
+              <ActivityIndicator color={Colors.primary} />
             </View>
           )}
         </ScrollView>
@@ -337,7 +338,7 @@ export const ChatScreen: React.FC = () => {
             value={input}
             onChangeText={setInput}
             placeholder="Напишите сообщение..."
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={Colors.textDim}
             multiline
           />
           <TouchableOpacity
@@ -409,7 +410,7 @@ export const ChatScreen: React.FC = () => {
 const styles = StyleSheet.create({
   safeContainer: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.background,
   },
   container: {
     flex: 1,
@@ -430,17 +431,17 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#1f2937',
+    color: Colors.textPrimary,
   },
   subtitle: {
     fontSize: 14,
-    color: '#6b7280',
+    color: Colors.textSecondary,
     marginTop: 4,
   },
   headerHistoryLink: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
+    color: Colors.primary,
   },
   messages: {
     flex: 1,
@@ -455,16 +456,17 @@ const styles = StyleSheet.create({
   emptyStateIcon: {
     fontSize: 40,
     marginBottom: 12,
+    color: Colors.textDim,
   },
   emptyStateTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#111827',
+    color: Colors.textPrimary,
     marginBottom: 8,
   },
   emptyStateText: {
     fontSize: 14,
-    color: '#6b7280',
+    color: Colors.textSecondary,
     textAlign: 'center',
   },
   bubble: {
@@ -475,38 +477,40 @@ const styles = StyleSheet.create({
     maxWidth: '85%',
   },
   bubbleUser: {
-    backgroundColor: '#dcfce7',
+    backgroundColor: 'rgba(16, 185, 129, 0.15)', // Low opacity primary
     alignSelf: 'flex-end',
     borderBottomRightRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
   },
   bubbleModel: {
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.card,
     alignSelf: 'flex-start',
     borderBottomLeftRadius: 4,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: Colors.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.2, // Darker shadow for dark theme
     shadowRadius: 1,
     elevation: 1,
   },
   textUser: {
-    color: '#064e3b',
+    color: Colors.primary, // Text color matches primary
     fontSize: 15,
   },
   textModel: {
-    color: '#1f2937',
+    color: Colors.textPrimary,
     fontSize: 15,
     lineHeight: 22,
   },
   textUserBold: {
     fontWeight: '700',
-    color: '#064e3b',
+    color: Colors.primary,
   },
   textModelBold: {
     fontWeight: '700',
-    color: '#111827',
+    color: Colors.textPrimary,
   },
   h1: {
     fontSize: 18,
@@ -531,6 +535,7 @@ const styles = StyleSheet.create({
   bullet: {
     width: 16,
     marginRight: 4,
+    color: Colors.textDim,
   },
   listNumber: {
     width: 20,
@@ -548,44 +553,48 @@ const styles = StyleSheet.create({
   },
   inputField: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.card,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: Colors.border,
     borderRadius: 24,
     paddingHorizontal: 16,
     paddingVertical: 10,
     fontSize: 15,
     maxHeight: 100,
-    color: '#111827',
+    color: Colors.textPrimary,
   },
   sendButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#10b981',
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   sendButtonDisabled: {
-    backgroundColor: '#d1fae5',
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   sendButtonArrow: {
-    color: '#ffffff',
+    color: '#000000', // Black arrow on primary button
     fontSize: 18,
     fontWeight: '700',
     marginLeft: 2,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.7)', // Darker overlay
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.card,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 20,
     maxHeight: '70%',
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -596,11 +605,11 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#111827',
+    color: Colors.textPrimary,
   },
   modalClose: {
     fontSize: 24,
-    color: '#9ca3af',
+    color: Colors.textDim,
   },
   modalItem: {
     flexDirection: 'row',
@@ -608,20 +617,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    borderBottomColor: Colors.divider,
   },
   modalItemActive: {
-    backgroundColor: '#f0fdf4',
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
     marginHorizontal: -20,
     paddingHorizontal: 20,
   },
   modalItemText: {
     fontSize: 16,
-    color: '#374151',
+    color: Colors.textSecondary,
   },
   modalItemTextActive: {
     fontWeight: '600',
-    color: '#15803d',
+    color: Colors.primary,
   },
   modalItemRight: {
     flexDirection: 'row',
@@ -630,11 +639,11 @@ const styles = StyleSheet.create({
   },
   modalItemCount: {
     fontSize: 13,
-    color: '#9ca3af',
+    color: Colors.textDim,
   },
   modalItemCheck: {
     fontSize: 16,
-    color: '#15803d',
+    color: Colors.primary,
     fontWeight: 'bold',
   },
 });

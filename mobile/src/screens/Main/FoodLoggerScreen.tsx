@@ -6,6 +6,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { MainStackParamList } from '../../navigation/MainStack';
 import { analyzeFoodImage } from '../../api/ai';
 import { createFood } from '../../api/food';
+import { Colors } from '../../constants/Colors';
 
 export type FoodLoggerProps = NativeStackScreenProps<MainStackParamList, 'FoodLogger'>;
 
@@ -113,7 +114,7 @@ export const FoodLoggerScreen: React.FC<FoodLoggerProps> = ({ navigation }) => {
   if (step === 'analyzing') {
     return (
       <View style={styles.analyzingContainer}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color={Colors.primary} />
         <Text style={styles.analyzingTitle}>Изучаю фото...</Text>
         <Text style={styles.analyzingSubtitle}>ИИ считает калории и оценивает полезность</Text>
         {imageUri && <Image source={{ uri: imageUri }} style={styles.analyzingImage} />}
@@ -136,8 +137,8 @@ export const FoodLoggerScreen: React.FC<FoodLoggerProps> = ({ navigation }) => {
                   Number(rating) >= 7
                     ? styles.ratingGood
                     : Number(rating) >= 5
-                    ? styles.ratingMedium
-                    : styles.ratingBad,
+                      ? styles.ratingMedium
+                      : styles.ratingBad,
                 ]}
               >
                 {rating}/10
@@ -148,7 +149,12 @@ export const FoodLoggerScreen: React.FC<FoodLoggerProps> = ({ navigation }) => {
 
         <View style={styles.card}>
           <Text style={styles.label}>Название блюда</Text>
-          <TextInput style={styles.input} value={name} onChangeText={setName} />
+          <TextInput
+            style={styles.input}
+            value={name}
+            onChangeText={setName}
+            placeholderTextColor={Colors.textDim}
+          />
 
           <View style={styles.macroRow}>
             <View style={styles.macroCol}>
@@ -158,6 +164,7 @@ export const FoodLoggerScreen: React.FC<FoodLoggerProps> = ({ navigation }) => {
                 value={calories}
                 onChangeText={setCalories}
                 keyboardType="numeric"
+                placeholderTextColor={Colors.textDim}
               />
             </View>
             <View style={styles.macroCol}>
@@ -167,6 +174,7 @@ export const FoodLoggerScreen: React.FC<FoodLoggerProps> = ({ navigation }) => {
                 value={protein}
                 onChangeText={setProtein}
                 keyboardType="numeric"
+                placeholderTextColor={Colors.textDim}
               />
             </View>
           </View>
@@ -179,6 +187,7 @@ export const FoodLoggerScreen: React.FC<FoodLoggerProps> = ({ navigation }) => {
                 value={fat}
                 onChangeText={setFat}
                 keyboardType="numeric"
+                placeholderTextColor={Colors.textDim}
               />
             </View>
             <View style={styles.macroCol}>
@@ -188,6 +197,7 @@ export const FoodLoggerScreen: React.FC<FoodLoggerProps> = ({ navigation }) => {
                 value={carbs}
                 onChangeText={setCarbs}
                 keyboardType="numeric"
+                placeholderTextColor={Colors.textDim}
               />
             </View>
           </View>
@@ -198,6 +208,7 @@ export const FoodLoggerScreen: React.FC<FoodLoggerProps> = ({ navigation }) => {
             value={rating}
             onChangeText={setRating}
             keyboardType="numeric"
+            placeholderTextColor={Colors.textDim}
           />
         </View>
 
@@ -257,6 +268,7 @@ const styles = StyleSheet.create({
     padding: 24,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: Colors.background,
   },
   captureHeroIconWrapper: {
     marginBottom: 24,
@@ -272,9 +284,9 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 32,
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.card,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: Colors.border,
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 4,
@@ -289,12 +301,12 @@ const styles = StyleSheet.create({
   captureTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#111827',
+    color: Colors.textPrimary,
     marginBottom: 8,
   },
   captureSubtitle: {
     fontSize: 14,
-    color: '#6b7280',
+    color: Colors.textSecondary,
     textAlign: 'center',
   },
   captureButtons: {
@@ -307,18 +319,18 @@ const styles = StyleSheet.create({
     padding: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.background,
   },
   analyzingTitle: {
     marginTop: 12,
     fontSize: 18,
     fontWeight: '600',
-    color: '#111827',
+    color: Colors.textPrimary,
   },
   analyzingSubtitle: {
     marginTop: 4,
     fontSize: 14,
-    color: '#6b7280',
+    color: Colors.textSecondary,
     textAlign: 'center',
   },
   analyzingImage: {
@@ -330,6 +342,8 @@ const styles = StyleSheet.create({
   reviewContainer: {
     padding: 16,
     paddingBottom: 32,
+    backgroundColor: Colors.background,
+    minHeight: '100%',
   },
   previewWrapper: {
     height: 220,
@@ -351,13 +365,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: 'rgba(255,255,255,0.95)',
+    backgroundColor: Colors.card,
     borderRadius: 16,
   },
   ratingBadgeLabel: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#4b5563',
+    color: Colors.textSecondary,
     marginRight: 4,
   },
   ratingBadgeValue: {
@@ -365,7 +379,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   ratingGood: {
-    color: '#16a34a',
+    color: '#16a34a', // Keep standard notification colors or update to Neon? Green is fine.
   },
   ratingMedium: {
     color: '#f59e0b',
@@ -374,25 +388,28 @@ const styles = StyleSheet.create({
     color: '#ef4444',
   },
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: Colors.card,
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   label: {
     fontSize: 12,
-    color: '#6b7280',
+    color: Colors.textSecondary,
     marginTop: 4,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: Colors.border,
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 8,
     marginTop: 4,
     fontSize: 14,
+    color: Colors.textPrimary,
+    backgroundColor: Colors.background,
   },
   macroRow: {
     flexDirection: 'row',
@@ -404,36 +421,40 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   analysisCard: {
-    backgroundColor: '#ecfdf5',
+    backgroundColor: Colors.card, // Was light green
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   analysisTitle: {
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 4,
-    color: '#166534',
+    color: Colors.primary,
   },
   analysisText: {
     fontSize: 14,
-    color: '#14532d',
+    color: Colors.textPrimary,
   },
   recommendationCard: {
-    backgroundColor: '#eff6ff',
+    backgroundColor: Colors.card, // Was light blue
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   recommendationTitle: {
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 4,
-    color: '#1d4ed8',
+    color: Colors.info,
   },
   recommendationText: {
     fontSize: 14,
-    color: '#1e3a8a',
+    color: Colors.textPrimary,
   },
   actionsRow: {
     flexDirection: 'row',
