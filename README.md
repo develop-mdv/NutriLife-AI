@@ -1,20 +1,40 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# NutriLife AI
 
-# Run and deploy your AI Studio app
+Монорепозиторий проекта NutriLife AI - умного трекера питания и фитнеса на базе Gemini.
 
-This contains everything you need to run your app locally.
+## Структура проекта
 
-View your app in AI Studio: https://ai.studio/apps/drive/1p4yqiwB7WbaaqgFvja4qXKDuotPfWV08
+*   **`/mobile`** - Мобильное приложение (React Native / Expo).
+*   **`/web`** - Веб-приложение (React / Vite).
+*   **`/server`** - Бэкенд сервер (Node.js / Express / MongoDB).
+*   **`/design`** - Материалы и референсы дизайна.
 
-## Run Locally
+## Запуск локально
 
-**Prerequisites:**  Node.js
+### Веб-приложение
+```bash
+cd web
+npm install
+npm run dev
+```
 
+### Мобильное приложение
+```bash
+cd mobile
+npm install
+# Запуск Expo
+npm start
+```
+Для запуска на Android/iOS используйте соответствующие команды Expo (`a`, `i`).
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+### Сервер
+```bash
+cd server
+npm install
+npm run dev
+```
+Сервер запустится на порту, указанном в `.env` сервера.
+
+## Требования
+*   Node.js
+*   Gemini API Key (для работы ИИ-функций)
