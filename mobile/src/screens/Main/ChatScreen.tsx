@@ -15,9 +15,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChatDaySummary, ChatMessage, getChatDays, getChatHistory, sendChatMessage } from '../../api/ai';
-import { Colors } from '../../constants/Colors';
+import { useTheme } from '../../context/ThemeContext';
+import { AppTheme } from '../../constants/Theme';
 
-const renderInlineFormatting = (text: string, isUser: boolean) => {
+const renderInlineFormatting = (text: string, isUser: boolean, styles: any) => {
   const baseStyle = isUser ? styles.textUser : styles.textModel;
   const boldStyle = isUser ? styles.textUserBold : styles.textModelBold;
   const segments = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
@@ -40,7 +41,7 @@ const renderInlineFormatting = (text: string, isUser: boolean) => {
   });
 };
 
-const renderMessageText = (text: string, isUser: boolean) => {
+const renderMessageText = (text: string, isUser: boolean, styles: any) => {
   const paragraphs = text.split(/\n{2,}/g);
   const baseStyle = isUser ? styles.textUser : styles.textModel;
 
@@ -55,7 +56,7 @@ const renderMessageText = (text: string, isUser: boolean) => {
               if (h3Match) {
                 return (
                   <Text key={li} style={[baseStyle, styles.h3]}>
-                    {renderInlineFormatting(h3Match[1], isUser)}
+                    {renderInlineFormatting(h3Match[1], isUser, styles)}
                   </Text>
                 );
               }
@@ -63,7 +64,7 @@ const renderMessageText = (text: string, isUser: boolean) => {
               if (h2Match) {
                 return (
                   <Text key={li} style={[baseStyle, styles.h2]}>
-                    {renderInlineFormatting(h2Match[1], isUser)}
+                    {renderInlineFormatting(h2Match[1], isUser, styles)}
                   </Text>
                 );
               }
@@ -71,7 +72,7 @@ const renderMessageText = (text: string, isUser: boolean) => {
               if (h1Match) {
                 return (
                   <Text key={li} style={[baseStyle, styles.h1]}>
-                    {renderInlineFormatting(h1Match[1], isUser)}
+                    {renderInlineFormatting(h1Match[1], isUser, styles)}
                   </Text>
                 );
               }
@@ -82,7 +83,7 @@ const renderMessageText = (text: string, isUser: boolean) => {
                   <View key={li} style={styles.listItem}>
                     <Text style={[baseStyle, styles.listNumber]}>{numberedMatch[1]}.</Text>
                     <Text style={[baseStyle, styles.listItemText]}>
-                      {renderInlineFormatting(numberedMatch[2], isUser)}
+                      {renderInlineFormatting(numberedMatch[2], isUser, styles)}
                     </Text>
                   </View>
                 );
@@ -94,7 +95,7 @@ const renderMessageText = (text: string, isUser: boolean) => {
                   <View key={li} style={styles.listItem}>
                     <Text style={[baseStyle, styles.bullet]}>•</Text>
                     <Text style={[baseStyle, styles.listItemText]}>
-                      {renderInlineFormatting(bulletMatch[1], isUser)}
+                      {renderInlineFormatting(bulletMatch[1], isUser, styles)}
                     </Text>
                   </View>
                 );
@@ -102,7 +103,7 @@ const renderMessageText = (text: string, isUser: boolean) => {
 
               return (
                 <Text key={li} style={baseStyle}>
-                  {renderInlineFormatting(line, isUser)}
+                  {renderInlineFormatting(line, isUser, styles)}
                 </Text>
               );
             })}
@@ -114,6 +115,8 @@ const renderMessageText = (text: string, isUser: boolean) => {
 };
 
 export const ChatScreen: React.FC = () => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => createStyles(theme), [theme]);
   const scrollRef = useRef<ScrollView | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -316,18 +319,18 @@ export const ChatScreen: React.FC = () => {
                   m.role === 'user' ? styles.bubbleUser : styles.bubbleModel,
                 ]}
               >
-                {renderMessageText(m.text, m.role === 'user')}
+                {renderMessageText(m.text, m.role === 'user', styles)}
               </View>
             ))
           )}
           {loadingHistory && (
             <View style={[styles.bubble, styles.bubbleModel]}>
-              <ActivityIndicator color={Colors.primary} />
+              <ActivityIndicator color={theme.colors.accentNutrition} />
             </View>
           )}
           {loading && (
             <View style={[styles.bubble, styles.bubbleModel]}>
-              <ActivityIndicator color={Colors.primary} />
+              <ActivityIndicator color={theme.colors.accentNutrition} />
             </View>
           )}
         </ScrollView>
@@ -338,7 +341,7 @@ export const ChatScreen: React.FC = () => {
             value={input}
             onChangeText={setInput}
             placeholder="Напишите сообщение..."
-            placeholderTextColor={Colors.textDim}
+            placeholderTextColor={theme.colors.textMuted}
             multiline
           />
           <TouchableOpacity
@@ -407,10 +410,10 @@ export const ChatScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   safeContainer: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: theme.colors.background,
   },
   container: {
     flex: 1,
@@ -431,17 +434,17 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '800',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   subtitle: {
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
     marginTop: 4,
   },
   headerHistoryLink: {
     fontSize: 16,
     fontWeight: '600',
-    color: Colors.primary,
+    color: theme.colors.accentNutrition,
   },
   messages: {
     flex: 1,
@@ -456,17 +459,17 @@ const styles = StyleSheet.create({
   emptyStateIcon: {
     fontSize: 40,
     marginBottom: 12,
-    color: Colors.textDim,
+    color: theme.colors.textMuted,
   },
   emptyStateTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
     marginBottom: 8,
   },
   emptyStateText: {
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
     textAlign: 'center',
   },
   bubble: {
@@ -484,33 +487,33 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(16, 185, 129, 0.3)',
   },
   bubbleModel: {
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
     alignSelf: 'flex-start',
     borderBottomLeftRadius: 4,
     borderWidth: 1,
-    borderColor: Colors.border,
-    shadowColor: '#000',
+    borderColor: theme.colors.border,
+    shadowColor: theme.mode === 'dark' ? theme.colors.accentNutrition : '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2, // Darker shadow for dark theme
     shadowRadius: 1,
     elevation: 1,
   },
   textUser: {
-    color: Colors.primary, // Text color matches primary
+    color: theme.colors.accentNutrition, // Text color matches primary
     fontSize: 15,
   },
   textModel: {
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
     fontSize: 15,
     lineHeight: 22,
   },
   textUserBold: {
     fontWeight: '700',
-    color: Colors.primary,
+    color: theme.colors.accentNutrition,
   },
   textModelBold: {
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   h1: {
     fontSize: 18,
@@ -535,7 +538,7 @@ const styles = StyleSheet.create({
   bullet: {
     width: 16,
     marginRight: 4,
-    color: Colors.textDim,
+    color: theme.colors.textMuted,
   },
   listNumber: {
     width: 20,
@@ -553,28 +556,28 @@ const styles = StyleSheet.create({
   },
   inputField: {
     flex: 1,
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
     borderRadius: 24,
     paddingHorizontal: 16,
     paddingVertical: 10,
     fontSize: 15,
     maxHeight: 100,
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   sendButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: Colors.primary,
+    backgroundColor: theme.colors.accentNutrition,
     alignItems: 'center',
     justifyContent: 'center',
   },
   sendButtonDisabled: {
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
   },
   sendButtonArrow: {
     color: '#000000', // Black arrow on primary button
@@ -588,13 +591,13 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 20,
     maxHeight: '70%',
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: theme.colors.border,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -605,11 +608,11 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   modalClose: {
     fontSize: 24,
-    color: Colors.textDim,
+    color: theme.colors.textMuted,
   },
   modalItem: {
     flexDirection: 'row',
@@ -617,7 +620,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.divider,
+    borderBottomColor: theme.colors.border,
   },
   modalItemActive: {
     backgroundColor: 'rgba(16, 185, 129, 0.1)',
@@ -626,11 +629,11 @@ const styles = StyleSheet.create({
   },
   modalItemText: {
     fontSize: 16,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
   },
   modalItemTextActive: {
     fontWeight: '600',
-    color: Colors.primary,
+    color: theme.colors.accentNutrition,
   },
   modalItemRight: {
     flexDirection: 'row',
@@ -639,11 +642,11 @@ const styles = StyleSheet.create({
   },
   modalItemCount: {
     fontSize: 13,
-    color: Colors.textDim,
+    color: theme.colors.textMuted,
   },
   modalItemCheck: {
     fontSize: 16,
-    color: Colors.primary,
+    color: theme.colors.accentNutrition,
     fontWeight: 'bold',
   },
 });

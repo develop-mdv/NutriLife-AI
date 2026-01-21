@@ -27,7 +27,8 @@ import {
   cancelSleepNotifications,
   SleepNotificationType,
 } from '../../hooks/useNotifications';
-import { Colors } from '../../constants/Colors';
+import { useTheme } from '../../context/ThemeContext';
+import { AppTheme } from '../../constants/Theme';
 
 export type SleepScreenProps = NativeStackScreenProps<MainStackParamList, 'Sleep'>;
 
@@ -40,6 +41,8 @@ interface SleepEntry {
 }
 
 export const SleepScreen: React.FC<SleepScreenProps> = ({ navigation }) => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => createStyles(theme), [theme]);
   const [activeTab, setActiveTab] = useState<SleepTab>('log');
 
   const [duration, setDuration] = useState(7.5);
@@ -319,7 +322,7 @@ export const SleepScreen: React.FC<SleepScreenProps> = ({ navigation }) => {
                         const v = Number(text.replace(',', '.'));
                         if (!isNaN(v)) setDuration(Math.max(3, Math.min(12, v)));
                       }}
-                      placeholderTextColor={Colors.textDim}
+                      placeholderTextColor={theme.colors.textMuted}
                     />
                     <View style={styles.presetRow}>
                       {[6, 7, 8].map((h) => (
@@ -445,7 +448,7 @@ export const SleepScreen: React.FC<SleepScreenProps> = ({ navigation }) => {
                       const v = Number(text.replace(',', '.'));
                       if (!isNaN(v)) setEditDuration(Math.max(1, Math.min(24, v)));
                     }}
-                    placeholderTextColor={Colors.textDim}
+                    placeholderTextColor={theme.colors.textMuted}
                   />
                   <View style={styles.presetRow}>
                     {[6, 7, 8].map((h) => (
@@ -539,7 +542,7 @@ export const SleepScreen: React.FC<SleepScreenProps> = ({ navigation }) => {
                   style={styles.timeInput}
                   value={settings.sleep.wakeTime}
                   onChangeText={onChangeWakeTime}
-                  placeholderTextColor={Colors.textDim}
+                  placeholderTextColor={theme.colors.textMuted}
                 />
                 <Text style={styles.timeHint}>время подъёма</Text>
               </View>
@@ -585,7 +588,7 @@ export const SleepScreen: React.FC<SleepScreenProps> = ({ navigation }) => {
                   style={styles.timeInput}
                   value={settings.sleep.bedTime}
                   onChangeText={onChangeBedTime}
-                  placeholderTextColor={Colors.textDim}
+                  placeholderTextColor={theme.colors.textMuted}
                 />
                 <Text style={styles.timeHint}>время отбоя</Text>
               </View>
@@ -600,7 +603,7 @@ export const SleepScreen: React.FC<SleepScreenProps> = ({ navigation }) => {
                   keyboardType="numeric"
                   value={String(settings.sleep.targetHours ?? '')}
                   onChangeText={onChangeTargetHours}
-                  placeholderTextColor={Colors.textDim}
+                  placeholderTextColor={theme.colors.textMuted}
                 />
                 <Text style={styles.timeHint}>часов / ночь</Text>
               </View>
@@ -633,10 +636,10 @@ export const SleepScreen: React.FC<SleepScreenProps> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   safeContainer: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: theme.colors.background,
   },
   container: {
     flex: 1,
@@ -652,30 +655,30 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 8,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
   },
   closeIconText: {
     fontSize: 16,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
     fontWeight: '600',
   },
   title: {
     fontSize: 22,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   subtitle: {
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
     marginTop: 4,
   },
   tabsContainer: {
     flexDirection: 'row',
-    backgroundColor: Colors.border,
+    backgroundColor: theme.colors.surfaceAlt,
     borderRadius: 999,
     padding: 4,
     marginBottom: 16,
@@ -687,31 +690,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tabButtonActive: {
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
   },
   tabText: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.textDim,
+    color: theme.colors.textMuted,
   },
   tabTextActive: {
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   section: {
     marginTop: 4,
   },
   // LOG TAB
   logCard: {
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
   },
   logTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
     marginBottom: 12,
   },
   logBlock: {
@@ -725,13 +728,13 @@ const styles = StyleSheet.create({
   logLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
     textTransform: 'uppercase',
   },
   logValue: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.primary,
+    color: theme.colors.accentSleep,
   },
   sliderRow: {
     flexDirection: 'row',
@@ -742,13 +745,13 @@ const styles = StyleSheet.create({
     width: 70,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
     paddingVertical: 6,
     paddingHorizontal: 8,
-    backgroundColor: Colors.background,
+    backgroundColor: theme.colors.background,
     textAlign: 'center',
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
     marginRight: 8,
   },
   presetRow: {
@@ -761,15 +764,15 @@ const styles = StyleSheet.create({
     marginHorizontal: 2,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: Colors.background,
+    backgroundColor: theme.colors.background,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
   },
   presetButtonText: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
   },
   qualityRow: {
     flexDirection: 'row',
@@ -781,19 +784,19 @@ const styles = StyleSheet.create({
     minWidth: 28,
     paddingVertical: 6,
     borderRadius: 10,
-    backgroundColor: Colors.background,
+    backgroundColor: theme.colors.background,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
   },
   qualityButtonActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+    backgroundColor: theme.colors.accentSleep,
+    borderColor: theme.colors.accentSleep,
   },
   qualityButtonText: {
     fontSize: 11,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
   },
   qualityButtonTextActive: {
     color: '#000000', // Black on neon green
@@ -804,14 +807,14 @@ const styles = StyleSheet.create({
     padding: 20,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: Colors.primary,
+    borderColor: theme.colors.accentSleep,
     marginBottom: 16,
   },
   successIconCircle: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: Colors.primary,
+    backgroundColor: theme.colors.accentSleep,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
@@ -823,12 +826,12 @@ const styles = StyleSheet.create({
   successTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
     marginBottom: 4,
   },
   successSubtitle: {
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
     textAlign: 'center',
   },
   historySection: {
@@ -837,11 +840,11 @@ const styles = StyleSheet.create({
   historyTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
     marginBottom: 12,
   },
   historyEmpty: {
-    color: Colors.textDim,
+    color: theme.colors.textMuted,
     fontSize: 14,
     fontStyle: 'italic',
   },
@@ -849,21 +852,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
     borderRadius: 12,
     padding: 12,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
   },
   historyItemDuration: {
     fontSize: 16,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   historyItemDate: {
     fontSize: 12,
-    color: Colors.textDim,
+    color: theme.colors.textMuted,
     marginTop: 2,
   },
   historyRightColumn: {
@@ -874,12 +877,12 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 6,
     marginBottom: 4,
-    backgroundColor: Colors.background,
+    backgroundColor: theme.colors.background,
   },
   historyQualityText: {
     fontSize: 12,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   historyQualityGood: {
     // borderLeftWidth: 3, borderLeftColor: '#16a34a' 
@@ -892,7 +895,7 @@ const styles = StyleSheet.create({
   },
   historyEditHint: {
     fontSize: 10,
-    color: Colors.primary,
+    color: theme.colors.accentSleep,
   },
   // Edit Modal
   editModalOverlay: {
@@ -906,11 +909,11 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   editModalCard: {
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
     borderRadius: 24,
     padding: 20,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
   },
   editModalHeader: {
     flexDirection: 'row',
@@ -921,21 +924,21 @@ const styles = StyleSheet.create({
   editModalTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   editModalCloseText: {
     fontSize: 24,
-    color: Colors.textDim,
+    color: theme.colors.textMuted,
     lineHeight: 24,
   },
   // SETTINGS TAB
   settingsCard: {
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
   },
   settingsHeaderRow: {
     flexDirection: 'row',
@@ -961,11 +964,11 @@ const styles = StyleSheet.create({
   settingsTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   settingsSubtitle: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
   },
   switch: {
     padding: 4,
@@ -974,12 +977,12 @@ const styles = StyleSheet.create({
     width: 44,
     height: 24,
     borderRadius: 12,
-    backgroundColor: Colors.border,
+    backgroundColor: theme.colors.border,
     justifyContent: 'center',
     paddingHorizontal: 2,
   },
   switchTrackOn: {
-    backgroundColor: Colors.info,
+    backgroundColor: theme.colors.accentSystem,
   },
   switchTrackOnPurple: {
     backgroundColor: '#8b5cf6',
@@ -1001,26 +1004,26 @@ const styles = StyleSheet.create({
   timeInput: {
     fontSize: 32,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: theme.colors.border,
     paddingVertical: 0,
     minWidth: 100,
   },
   timeHint: {
     fontSize: 14,
-    color: Colors.textDim,
+    color: theme.colors.textMuted,
   },
   settingsFootnote: {
     fontSize: 11,
-    color: Colors.textDim,
+    color: theme.colors.textMuted,
     marginTop: 12,
     fontStyle: 'italic',
   },
   goalLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
     marginBottom: 8,
   },
   goalRow: {
@@ -1031,31 +1034,31 @@ const styles = StyleSheet.create({
   goalInput: {
     fontSize: 32,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: theme.colors.border,
     paddingVertical: 0,
     minWidth: 60,
     textAlign: 'center',
   },
   // TIPS TAB
   tipCard: {
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
   },
   tipTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
     marginBottom: 6,
   },
   tipText: {
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
     lineHeight: 20,
   },
   tipChatCard: {
@@ -1065,12 +1068,12 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: Colors.primary,
+    borderColor: theme.colors.accentSleep,
   },
   tipChatText: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.primary,
+    color: theme.colors.accentSleep,
     textAlign: 'center',
   },
 });

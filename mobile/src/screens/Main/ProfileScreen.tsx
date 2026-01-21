@@ -16,7 +16,9 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Colors } from '../../constants/Colors';
+
+import { useTheme } from '../../context/ThemeContext';
+import { AppTheme } from '../../constants/Theme';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import Svg, { Rect, Text as SvgText } from 'react-native-svg';
@@ -58,14 +60,7 @@ interface AchievementMobile {
 }
 type HistoryPeriod = 'week' | 'month';
 
-const ProgressBar: React.FC<{ current: number; max: number; color: string }> = ({ current, max, color }) => {
-  const ratio = max > 0 ? Math.min(current / max, 1) : 0;
-  return (
-    <View style={styles.progressOuter}>
-      <View style={[styles.progressInner, { width: `${ratio * 100}%`, backgroundColor: color }]} />
-    </View>
-  );
-};
+import { ProgressBar } from '../../components/ProgressBar';
 
 const translateGoal = (goal: string | undefined) => {
   switch (goal) {
@@ -85,7 +80,11 @@ export const ProfileScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { stats: todayStats } = useTodayStats();
+
   const { loading: historyLoading, history, summary } = useHistoryStats();
+
+  const { theme, mode, toggleTheme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('stats');
   const [historyPeriod, setHistoryPeriod] = useState<HistoryPeriod>('week');
@@ -524,7 +523,7 @@ export const ProfileScreen: React.FC = () => {
                   <ProgressBar
                     current={todayStats.calories}
                     max={profile.dailyCalorieGoal || 2000}
-                    color="#34D399"
+                    color={theme.colors.accentNutrition}
                   />
                 </View>
               </View>
@@ -537,7 +536,7 @@ export const ProfileScreen: React.FC = () => {
                   <ProgressBar
                     current={todayStats.steps}
                     max={profile.dailyStepGoal || 10000}
-                    color="#EF4444"
+                    color={theme.colors.accentActivity}
                   />
                 </View>
               </View>
@@ -550,7 +549,7 @@ export const ProfileScreen: React.FC = () => {
                   <ProgressBar
                     current={todayStats.water}
                     max={waterGoal || 2000}
-                    color="#06B6D4"
+                    color={theme.colors.accentSystem}
                   />
                 </View>
               </View>
@@ -1087,6 +1086,28 @@ export const ProfileScreen: React.FC = () => {
               </View>
             </View>
 
+            {/* Внешний вид */}
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Внешний вид</Text>
+              <View style={styles.switchRow}>
+                {/* Dynamic label and icon: Sun for Light, Moon for Dark */}
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 20, marginRight: 8 }}>
+                    {mode === 'dark' ? '🌙' : '☀️'}
+                  </Text>
+                  <Text style={styles.formLabel}>
+                    {mode === 'dark' ? 'Темная тема' : 'Светлая тема'}
+                  </Text>
+                </View>
+                <Switch
+                  value={mode === 'dark'}
+                  onValueChange={toggleTheme}
+                  trackColor={{ false: theme.colors.surfaceAlt, true: theme.colors.accentNutrition }}
+                  thumbColor={Platform.OS === 'ios' ? undefined : '#fff'}
+                />
+              </View>
+            </View>
+
             {/* Сон и напоминания */}
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Сон и напоминания</Text>
@@ -1360,7 +1381,7 @@ export const ProfileScreen: React.FC = () => {
                       margin: 4,
                       borderRadius: 999,
                       borderWidth: profile.avatarEmoji === emoji ? 2 : 1,
-                      borderColor: profile.avatarEmoji === emoji ? Colors.primary : Colors.border,
+                      borderColor: profile.avatarEmoji === emoji ? theme.colors.accentNutrition : theme.colors.border,
                     }}
                     onPress={() => {
                       const updated: UserProfileApi = { ...profile, avatarEmoji: emoji };
@@ -1425,10 +1446,10 @@ export const ProfileScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   safeContainer: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: theme.colors.background,
   },
   container: {
     flex: 1,
@@ -1438,46 +1459,46 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.background,
+    backgroundColor: theme.colors.background,
   },
   headerCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
     borderRadius: 24,
     padding: 16,
     marginBottom: 16,
     elevation: 2,
-    shadowColor: Colors.primary,
+    shadowColor: theme.colors.accentNutrition,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
   },
   avatarCircle: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: Colors.background,
+    backgroundColor: theme.colors.background,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
     borderWidth: 2,
-    borderColor: Colors.primary,
+    borderColor: theme.colors.accentNutrition,
   },
   avatarText: {
     fontSize: 24,
     fontWeight: '700',
-    color: Colors.primary,
+    color: theme.colors.accentNutrition,
   },
   name: {
     fontSize: 20,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   email: {
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
     marginTop: 2,
   },
   goalChip: {
@@ -1493,12 +1514,12 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(16, 185, 129, 0.2)',
   },
   goalChipLabel: {
-    color: Colors.primary,
+    color: theme.colors.accentNutrition,
     fontSize: 13,
     marginRight: 4,
   },
   goalChipValue: {
-    color: Colors.primary,
+    color: theme.colors.accentNutrition,
     fontWeight: '600',
     fontSize: 13,
   },
@@ -1507,24 +1528,24 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   chip: {
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
     borderRadius: 999,
     paddingHorizontal: 8,
     paddingVertical: 4,
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
     marginRight: 6,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
   },
   tabsRow: {
     flexDirection: 'row',
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
     borderRadius: 999,
     padding: 4,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
   },
   tabButton: {
     flex: 1,
@@ -1533,29 +1554,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tabButtonActive: {
-    backgroundColor: Colors.background,
-    shadowColor: Colors.primary,
+    backgroundColor: theme.colors.background,
+    shadowColor: theme.colors.accentNutrition,
     shadowOpacity: 0.2,
     shadowRadius: 4,
   },
   tabText: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
   },
   tabTextActive: {
-    color: Colors.primary,
+    color: theme.colors.accentNutrition,
     fontWeight: '700',
   },
   card: {
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
     elevation: 2,
     borderWidth: 1,
-    borderColor: Colors.border,
-    shadowColor: '#000',
+    borderColor: theme.colors.border,
+    shadowColor: theme.mode === 'dark' ? theme.colors.accentNutrition : '#000',
     shadowOpacity: 0.1,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
@@ -1564,25 +1585,25 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 8,
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   statRow: {
     marginTop: 8,
   },
   statLabel: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
   },
   statValue: {
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 4,
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   progressOuter: {
     height: 8,
     borderRadius: 999,
-    backgroundColor: Colors.border,
+    backgroundColor: theme.colors.surfaceAlt,
     overflow: 'hidden',
   },
   progressInner: {
@@ -1597,7 +1618,7 @@ const styles = StyleSheet.create({
   },
   historyPeriodRow: {
     flexDirection: 'row',
-    backgroundColor: Colors.border,
+    backgroundColor: theme.colors.surfaceAlt,
     borderRadius: 999,
     padding: 2,
   },
@@ -1607,14 +1628,14 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   historyPeriodChipActive: {
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
   },
   historyPeriodText: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
   },
   historyPeriodTextActive: {
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
     fontWeight: '600',
   },
   historyGrid: {
@@ -1628,34 +1649,34 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 8,
     margin: '2%',
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
   },
   historyLabel: {
     fontSize: 10,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
     marginBottom: 4,
   },
   historyValue: {
     fontSize: 18,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   historyUnit: {
     fontSize: 11,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
   },
   historyChartsWrapper: {
     marginTop: 16,
   },
   historyChartBox: {
     marginTop: 12,
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
   },
   historyChartHeader: {
     flexDirection: 'row',
@@ -1666,7 +1687,7 @@ const styles = StyleSheet.create({
   historyChartTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   historyChartScroll: {
     marginTop: 4,
@@ -1675,27 +1696,27 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   historyChartTooltipBadge: {
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 4,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: Colors.border,
-    shadowColor: '#000',
+    borderColor: theme.colors.border,
+    shadowColor: theme.mode === 'dark' ? theme.colors.accentNutrition : '#000',
     shadowOpacity: 0.2,
     shadowRadius: 4,
   },
   historyChartTooltipDate: {
     fontSize: 11,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
     marginRight: 6,
   },
   historyChartTooltipValue: {
     fontSize: 12,
     fontWeight: '700',
-    color: Colors.primary,
+    color: theme.colors.accentNutrition,
   },
   achievementsGrid: {
     flexDirection: 'row',
@@ -1710,17 +1731,17 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginRight: '3%',
     alignItems: 'center',
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
   },
   achievementCardUnlocked: {
     backgroundColor: 'rgba(251, 191, 36, 0.1)',
     borderWidth: 1,
-    borderColor: Colors.fat,
+    borderColor: theme.colors.accentNutrition,
   },
   achievementCardLocked: {
-    backgroundColor: Colors.background,
+    backgroundColor: theme.colors.background,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
     opacity: 0.7,
   },
   achievementIcon: {
@@ -1731,20 +1752,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     textAlign: 'center',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   achievementProgressBarOuter: {
     marginTop: 6,
     height: 4,
     width: '100%',
     borderRadius: 999,
-    backgroundColor: Colors.border,
+    backgroundColor: theme.colors.surfaceAlt,
     overflow: 'hidden',
   },
   achievementProgressBarInner: {
     height: '100%',
     borderRadius: 999,
-    backgroundColor: Colors.fat,
+    backgroundColor: theme.colors.accentNutrition,
   },
   formRow: {
     flexDirection: 'row',
@@ -1770,20 +1791,20 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.card,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
     overflow: 'hidden',
     marginRight: 8,
   },
   genderCardSelected: {
-    borderColor: Colors.primary,
+    borderColor: theme.colors.accentNutrition,
     backgroundColor: 'rgba(16, 185, 129, 0.1)',
   },
   genderImageStub: {
     height: 110,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
   },
   genderImage: {
     width: '70%',
@@ -1799,13 +1820,13 @@ const styles = StyleSheet.create({
   genderLabel: {
     fontSize: 15,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   genderCheckBadge: {
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: Colors.primary,
+    backgroundColor: theme.colors.accentNutrition,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1816,18 +1837,18 @@ const styles = StyleSheet.create({
   },
   formLabel: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
     marginBottom: 4,
   },
   input: {
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
     paddingHorizontal: 10,
     paddingVertical: 8,
     fontSize: 14,
-    color: Colors.textPrimary,
-    backgroundColor: Colors.background,
+    color: theme.colors.textPrimary,
+    backgroundColor: theme.colors.background,
   },
   textArea: {
     minHeight: 72,
@@ -1840,28 +1861,28 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   planHeaderBox: {
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
   },
   planGoalLabel: {
     fontSize: 12,
-    color: Colors.textDim,
+    color: theme.colors.textMuted,
     textTransform: 'uppercase',
   },
   planGoalValue: {
     marginTop: 4,
     fontSize: 18,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   planTargetsText: {
     marginTop: 8,
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
   },
   planStepsWrapper: {
     marginTop: 8,
@@ -1882,50 +1903,50 @@ const styles = StyleSheet.create({
   },
   planStepCircleText: {
     fontWeight: '700',
-    color: Colors.primary,
+    color: theme.colors.accentNutrition,
   },
   planStepCard: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: theme.colors.background,
     borderRadius: 12,
     padding: 10,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
   },
   planStepTitle: {
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 4,
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   planStepDescription: {
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
   },
   planFooterRow: {
     marginTop: 8,
   },
   planFooterText: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
     marginBottom: 8,
   },
   planEmptyBox: {
     padding: 16,
     borderRadius: 16,
-    backgroundColor: Colors.background,
+    backgroundColor: theme.colors.background,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
   },
   planEmptyTitle: {
     fontSize: 18,
     fontWeight: '700',
     marginBottom: 4,
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   planEmptyText: {
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
     marginBottom: 12,
   },
   planPendingBox: {
@@ -1936,11 +1957,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 4,
     textAlign: 'center',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   planPendingText: {
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
     textAlign: 'center',
   },
   planOverlay: {
@@ -1957,28 +1978,28 @@ const styles = StyleSheet.create({
   planOverlayCard: {
     width: '100%',
     borderRadius: 20,
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
     padding: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
   },
   planOverlayTitle: {
     fontSize: 18,
     fontWeight: '700',
     marginBottom: 8,
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   planOverlayText: {
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
     marginBottom: 12,
   },
   planOverlayInput: {
     minHeight: 100,
     textAlignVertical: 'top',
     marginBottom: 12,
-    color: Colors.textPrimary,
-    backgroundColor: Colors.background,
+    color: theme.colors.textPrimary,
+    backgroundColor: theme.colors.background,
     borderRadius: 12,
     padding: 10,
   },
@@ -1991,26 +2012,26 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 420,
     borderRadius: 20,
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
     padding: 20,
     elevation: 4,
-    shadowColor: '#000',
+    shadowColor: theme.mode === 'dark' ? theme.colors.accentNutrition : '#000',
     shadowOpacity: 0.2,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
   },
   goalOverlayTitle: {
     fontSize: 20,
     fontWeight: '700',
     marginBottom: 6,
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
     textAlign: 'center',
   },
   goalOverlaySubtitle: {
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
     marginBottom: 14,
     textAlign: 'center',
   },
@@ -2019,40 +2040,40 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 14,
     marginBottom: 10,
-    backgroundColor: Colors.background,
+    backgroundColor: theme.colors.background,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
   },
   goalOptionRowActive: {
     backgroundColor: 'rgba(16, 185, 129, 0.1)',
     borderWidth: 2,
-    borderColor: Colors.primary,
+    borderColor: theme.colors.accentNutrition,
   },
   goalOptionLabel: {
     fontSize: 17,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
     marginBottom: 4,
   },
   goalOptionDescription: {
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
     lineHeight: 18,
   },
   achievementOverlayCard: {
     width: '100%',
     borderRadius: 20,
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
     padding: 20,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
   },
   achievementOverlayTitle: {
     fontSize: 18,
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: 4,
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   achievementOverlayIcon: {
     fontSize: 32,
@@ -2061,19 +2082,19 @@ const styles = StyleSheet.create({
   },
   achievementOverlayDescription: {
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
     textAlign: 'center',
   },
   achievementOverlayProgressLabel: {
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
     marginBottom: 4,
   },
   achievementOverlayUnlocked: {
     marginTop: 12,
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.primary,
+    color: theme.colors.accentNutrition,
     textAlign: 'center',
   },
 });

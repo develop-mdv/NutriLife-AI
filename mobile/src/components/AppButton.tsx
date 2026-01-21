@@ -1,6 +1,6 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, GestureResponderEvent, ViewStyle, TextStyle } from 'react-native';
-import { Colors } from '../constants/Colors';
+import { useTheme } from '../context/ThemeContext';
 
 export interface AppButtonProps {
   title: string;
@@ -19,21 +19,64 @@ export const AppButton: React.FC<AppButtonProps> = ({
   textStyle,
   variant = 'primary'
 }) => {
-  const getButtonStyle = () => {
-    if (disabled) return styles.appButtonDisabled;
+  const { theme, mode } = useTheme();
+
+  const getButtonStyle = (): ViewStyle => {
+    if (disabled) return {
+      backgroundColor: mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
+      borderColor: 'transparent',
+    };
+
     switch (variant) {
-      case 'secondary': return styles.appButtonSecondary;
-      case 'glass': return styles.appButtonGlass;
-      default: return styles.appButtonPrimary;
+      case 'secondary':
+        return {
+          backgroundColor: 'transparent',
+          borderWidth: 1,
+          borderColor: theme.colors.border,
+        };
+      case 'glass':
+        return {
+          backgroundColor: theme.colors.surface,
+          borderWidth: 1,
+          borderColor: theme.colors.border,
+        };
+      case 'primary':
+      default:
+        const glowStyles = theme.effects.glow ? {
+          shadowColor: theme.colors.accentNutrition,
+          shadowOffset: { width: 0, height: 0 },
+          shadowOpacity: 0.5,
+          shadowRadius: 8,
+          elevation: 4,
+        } : {};
+
+        return {
+          backgroundColor: mode === 'dark' ? 'rgba(0, 255, 136, 0.15)' : theme.colors.accentNutrition,
+          borderWidth: 1,
+          borderColor: theme.colors.accentNutrition,
+          ...glowStyles
+        };
     }
   };
 
-  const getTextStyle = () => {
-    if (disabled) return styles.appButtonTextDisabled;
+  const getTextStyle = (): TextStyle => {
+    if (disabled) return { color: theme.colors.textMuted };
+
     switch (variant) {
-      case 'secondary': return styles.appButtonTextSecondary;
-      case 'glass': return styles.appButtonTextSecondary;
-      default: return styles.appButtonTextPrimary;
+      case 'secondary':
+      case 'glass':
+        return { color: theme.colors.textSecondary };
+      case 'primary':
+      default:
+        // In light mode, primary button usually has white text if background is filled
+        if (mode === 'light') return { color: '#FFFFFF' };
+
+        return {
+          color: theme.colors.accentNutrition,
+          textShadowColor: theme.colors.accentNutrition,
+          textShadowOffset: { width: 0, height: 0 },
+          textShadowRadius: 8,
+        };
     }
   };
 
@@ -52,7 +95,7 @@ export const AppButton: React.FC<AppButtonProps> = ({
 
 const styles = StyleSheet.create({
   baseButton: {
-    borderRadius: 24, // Neo-Tech requirement (20-28px)
+    borderRadius: 24,
     paddingVertical: 12,
     paddingHorizontal: 20,
     alignItems: 'center',
@@ -61,51 +104,7 @@ const styles = StyleSheet.create({
   baseText: {
     fontWeight: '600',
     fontSize: 14,
-    textTransform: 'uppercase', // Tech feel
+    textTransform: 'uppercase',
     letterSpacing: 0.5,
-  },
-
-  // Primary (Neon Glow)
-  appButtonPrimary: {
-    backgroundColor: 'rgba(0, 255, 136, 0.15)', // Low opacity neon fill
-    borderWidth: 1,
-    borderColor: Colors.primary,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8, // Glow effect
-    elevation: 4,
-  },
-  appButtonTextPrimary: {
-    color: Colors.primary,
-    textShadowColor: Colors.primary,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 8,
-  },
-
-  // Secondary
-  appButtonSecondary: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  appButtonTextSecondary: {
-    color: Colors.textSecondary,
-  },
-
-  // Glass
-  appButtonGlass: {
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-
-  // Disabled
-  appButtonDisabled: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderColor: 'transparent',
-  },
-  appButtonTextDisabled: {
-    color: Colors.textDim,
   },
 });

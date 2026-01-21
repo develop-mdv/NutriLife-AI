@@ -7,6 +7,8 @@ import { DashboardScreen } from '../screens/Main/DashboardScreen';
 import { ChatScreen } from '../screens/Main/ChatScreen';
 import { WalksScreen } from '../screens/Main/WalksScreen';
 import { ProfileScreen } from '../screens/Main/ProfileScreen';
+import { useTheme } from '../context/ThemeContext';
+import { AppTheme } from '../constants/Theme';
 
 export type MainTabParamList = {
   Dashboard: undefined;
@@ -18,6 +20,8 @@ export type MainTabParamList = {
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigation }) => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => createStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
 
   const handlePlusPress = () => {
@@ -27,8 +31,8 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigat
 
   return (
 
-    <View style={[stylesTab.container, { paddingBottom: Math.max(insets.bottom, 8) }]}>
-      <View style={stylesTab.innerRow}>
+    <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+      <View style={styles.innerRow}>
         {state.routes.map((route, index) => {
           const { options } = descriptors[route.key];
           const label =
@@ -87,26 +91,26 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigat
               accessibilityLabel={options.tabBarAccessibilityLabel}
               onPress={onPress}
               onLongPress={onLongPress}
-              style={[stylesTab.tabItem, isNearCenter && stylesTab.tabItemWithSpacer]}
+              style={[styles.tabItem, isNearCenter && styles.tabItemWithSpacer]}
               activeOpacity={0.8}
             >
-              <Text style={[stylesTab.icon, isFocused && stylesTab.iconActive]}>
+              <Text style={[styles.icon, isFocused && styles.iconActive]}>
                 {route.name === 'Dashboard' && '🏠'}
                 {route.name === 'Chat' && '💬'}
                 {route.name === 'Walks' && '🚶'}
                 {route.name === 'Profile' && '👤'}
               </Text>
-              <Text style={[stylesTab.label, isFocused && stylesTab.labelActive]}>{label}</Text>
+              <Text style={[styles.label, isFocused && styles.labelActive]}>{label}</Text>
             </TouchableOpacity>
           );
         })}
       </View>
 
       {/* Центральная кнопка + как на веб-версии */}
-      <View style={stylesTab.plusWrapper}>
-        <TouchableOpacity style={stylesTab.plusButtonShadow} onPress={handlePlusPress} activeOpacity={0.9}>
-          <View style={stylesTab.plusButton}>
-            <Text style={stylesTab.plusText}>+</Text>
+      <View style={styles.plusWrapper}>
+        <TouchableOpacity style={styles.plusButtonShadow} onPress={handlePlusPress} activeOpacity={0.9}>
+          <View style={styles.plusButton}>
+            <Text style={styles.plusText}>+</Text>
           </View>
         </TouchableOpacity>
       </View>
@@ -128,11 +132,11 @@ export const MainTabs: React.FC = () => {
   );
 };
 
-const stylesTab = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
-    backgroundColor: '#18181b', // Zinc-900
+    backgroundColor: theme.mode === 'dark' ? '#18181b' : theme.colors.surface,
     borderTopWidth: 1,
-    borderTopColor: '#27272a',
+    borderTopColor: theme.mode === 'dark' ? '#27272a' : theme.colors.border,
   },
   innerRow: {
     flexDirection: 'row',
@@ -154,21 +158,21 @@ const stylesTab = StyleSheet.create({
   },
   icon: {
     fontSize: 22,
-    color: '#6b7280',
+    color: theme.colors.textMuted,
     marginBottom: 4,
   },
   iconActive: {
-    color: '#10b981',
-    textShadowColor: 'rgba(16, 185, 129, 0.4)',
+    color: theme.colors.accentNutrition,
+    textShadowColor: theme.effects.glow ? theme.colors.accentNutrition : 'transparent',
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 8,
   },
   label: {
     fontSize: 10,
-    color: '#6b7280',
+    color: theme.colors.textMuted,
   },
   labelActive: {
-    color: '#f3f4f6', // bright white-ish
+    color: theme.colors.textPrimary,
     fontWeight: '600',
   },
   plusWrapper: {
@@ -182,7 +186,7 @@ const stylesTab = StyleSheet.create({
     height: 64,
     borderRadius: 32,
     elevation: 8,
-    shadowColor: '#10b981',
+    shadowColor: theme.colors.accentNutrition,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.5,
     shadowRadius: 8,
@@ -191,15 +195,15 @@ const stylesTab = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#10b981',
+    backgroundColor: theme.colors.accentNutrition,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 4,
-    borderColor: '#18181b', // matches tab bar bg
+    borderColor: theme.colors.surface, // matches tab bar bg
   },
   plusText: {
     fontSize: 32,
-    color: '#ffffff',
+    color: '#ffffff', // Keep white for plus icon on accent color
     marginTop: -2,
     fontWeight: '300',
   },

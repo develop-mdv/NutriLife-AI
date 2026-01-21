@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Animated, Easing, StyleSheet, ViewStyle } from 'react-native';
 import Svg, { Circle, G } from 'react-native-svg';
-import { Colors } from '../constants/Colors';
+import { useTheme } from '../context/ThemeContext';
 
 interface ProgressRingProps {
     radius?: number;
@@ -18,14 +18,20 @@ export const ProgressRing: React.FC<ProgressRingProps> = ({
     radius = 80,
     stroke = 18,
     progress,
-    color = Colors.primary,
-    trackColor = Colors.border,
+    color,
+    trackColor,
     style,
 }) => {
+    const { theme } = useTheme();
     const animatedProgress = useRef(new Animated.Value(0)).current;
 
     const normalizedRadius = radius - stroke / 2;
     const circumference = normalizedRadius * 2 * Math.PI;
+
+    // Use passed color or fallback to theme primary accent
+    const activeColor = color || theme.colors.accentNutrition;
+    const activeTrackColor = trackColor || theme.colors.border;
+    const glowEnabled = theme.effects.glow;
 
     useEffect(() => {
         Animated.timing(animatedProgress, {
@@ -51,43 +57,48 @@ export const ProgressRing: React.FC<ProgressRingProps> = ({
                         cx={radius}
                         cy={radius}
                         r={normalizedRadius}
-                        stroke={trackColor}
+                        stroke={activeTrackColor}
                         strokeWidth={stroke}
                         fill="transparent"
                         strokeOpacity={0.3}
                     />
-                    {/* Glow Layer: Wider stroke + lower opacity to simulate neon bloom */}
-                    <AnimatedCircle
-                        cx={radius}
-                        cy={radius}
-                        r={normalizedRadius}
-                        stroke={color}
-                        strokeWidth={stroke + 6}
-                        strokeDasharray={circumference}
-                        strokeDashoffset={strokeDashoffset}
-                        strokeLinecap="round"
-                        fill="transparent"
-                        strokeOpacity={0.15}
-                    />
-                    {/* Second Glow Layer */}
-                    <AnimatedCircle
-                        cx={radius}
-                        cy={radius}
-                        r={normalizedRadius}
-                        stroke={color}
-                        strokeWidth={stroke + 2}
-                        strokeDasharray={circumference}
-                        strokeDashoffset={strokeDashoffset}
-                        strokeLinecap="round"
-                        fill="transparent"
-                        strokeOpacity={0.2}
-                    />
+
+                    {/* Glow Layers - only render if theme enables glow */}
+                    {glowEnabled && (
+                        <>
+                            <AnimatedCircle
+                                cx={radius}
+                                cy={radius}
+                                r={normalizedRadius}
+                                stroke={activeColor}
+                                strokeWidth={stroke + 6}
+                                strokeDasharray={circumference}
+                                strokeDashoffset={strokeDashoffset}
+                                strokeLinecap="round"
+                                fill="transparent"
+                                strokeOpacity={0.15}
+                            />
+                            <AnimatedCircle
+                                cx={radius}
+                                cy={radius}
+                                r={normalizedRadius}
+                                stroke={activeColor}
+                                strokeWidth={stroke + 2}
+                                strokeDasharray={circumference}
+                                strokeDashoffset={strokeDashoffset}
+                                strokeLinecap="round"
+                                fill="transparent"
+                                strokeOpacity={0.2}
+                            />
+                        </>
+                    )}
+
                     {/* Main Progress Stroke */}
                     <AnimatedCircle
                         cx={radius}
                         cy={radius}
                         r={normalizedRadius}
-                        stroke={color}
+                        stroke={activeColor}
                         strokeWidth={stroke}
                         strokeDasharray={circumference}
                         strokeDashoffset={strokeDashoffset}

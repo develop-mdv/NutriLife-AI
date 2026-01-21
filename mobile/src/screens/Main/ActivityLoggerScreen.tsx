@@ -12,7 +12,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { MainStackParamList } from '../../navigation/MainStack';
 import { getProfile, getTodayStats, updateTodayStats } from '../../api/me';
-import { Colors } from '../../constants/Colors';
+import { useTheme } from '../../context/ThemeContext';
+import { AppTheme } from '../../constants/Theme';
 
 export type ActivityLoggerScreenProps = NativeStackScreenProps<
   MainStackParamList,
@@ -47,6 +48,8 @@ const INTENSITIES: IntensityOption[] = [
 ];
 
 export const ActivityLoggerScreen: React.FC<ActivityLoggerScreenProps> = ({ navigation }) => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => createStyles(theme), [theme]);
   const [selectedActivity, setSelectedActivity] = useState<ActivityOption>(ACTIVITIES[0]);
   const [selectedIntensity, setSelectedIntensity] = useState<IntensityOption>(INTENSITIES[1]);
   const [durationMinutes, setDurationMinutes] = useState('30');
@@ -176,7 +179,7 @@ export const ActivityLoggerScreen: React.FC<ActivityLoggerScreenProps> = ({ navi
                 keyboardType="numeric"
                 value={durationMinutes}
                 onChangeText={setDurationMinutes}
-                placeholderTextColor={Colors.textDim}
+                placeholderTextColor={theme.colors.textMuted}
               />
               <View style={styles.durationPresetsRow}>
                 {[20, 30, 45].map((m) => (
@@ -234,10 +237,10 @@ export const ActivityLoggerScreen: React.FC<ActivityLoggerScreenProps> = ({ navi
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   safeContainer: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: theme.colors.background,
   },
   container: {
     flex: 1,
@@ -250,12 +253,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   subtitle: {
     marginTop: 4,
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
   },
   activitiesGrid: {
     flexDirection: 'row',
@@ -266,41 +269,41 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 10,
     borderRadius: 12,
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
     marginRight: 8,
     marginBottom: 8,
   },
   activityButtonActive: {
-    borderColor: Colors.primary,
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderColor: theme.colors.accentActivity,
+    backgroundColor: 'rgba(234, 88, 12, 0.1)', // Changed to orange tint to match activity theme? Or keep green? Previous was generic primary. Let's use theme.colors.accentActivity which is usually orange/red for activity.
   },
   activityButtonText: {
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
     fontWeight: '500',
   },
   activityButtonTextActive: {
-    color: Colors.primary,
+    color: theme.colors.accentActivity,
   },
   card: {
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
     marginBottom: 16,
   },
   label: {
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
     textTransform: 'uppercase',
   },
   intensityRow: {
     flexDirection: 'row',
-    backgroundColor: Colors.background, // Inner background
+    backgroundColor: theme.colors.background, // Inner background
     borderRadius: 10,
     padding: 2,
     marginTop: 8,
@@ -312,7 +315,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   intensityButtonActive: {
-    backgroundColor: Colors.card, // Highlighted
+    backgroundColor: theme.colors.surface, // Highlighted
     shadowColor: '#000',
     shadowOpacity: 0.1,
     shadowRadius: 2,
@@ -321,10 +324,10 @@ const styles = StyleSheet.create({
   intensityButtonText: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.textDim,
+    color: theme.colors.textMuted,
   },
   intensityButtonTextActive: {
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   durationRow: {
     flexDirection: 'row',
@@ -335,13 +338,13 @@ const styles = StyleSheet.create({
     width: 70,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
     paddingVertical: 6,
     paddingHorizontal: 8,
     textAlign: 'center',
     fontWeight: '600',
-    color: Colors.textPrimary,
-    backgroundColor: Colors.background,
+    color: theme.colors.textPrimary,
+    backgroundColor: theme.colors.background,
     marginRight: 8,
   },
   durationPresetsRow: {
@@ -354,15 +357,15 @@ const styles = StyleSheet.create({
     marginHorizontal: 2,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: Colors.background,
+    backgroundColor: theme.colors.background,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
   },
   durationPresetText: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
   },
   caloriesCard: {
     backgroundColor: 'rgba(234, 88, 12, 0.1)', // Orange tint
@@ -376,13 +379,13 @@ const styles = StyleSheet.create({
   },
   caloriesLabel: {
     fontSize: 13,
-    color: Colors.secondary,
+    color: theme.colors.accentActivity,
     marginBottom: 4,
   },
   caloriesInput: {
     fontSize: 32,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
     textAlign: 'center',
     minWidth: 80,
     borderBottomWidth: 1,
@@ -401,7 +404,7 @@ const styles = StyleSheet.create({
   caloriesHintText: {
     fontSize: 10,
     fontWeight: '700',
-    color: Colors.secondary,
+    color: theme.colors.accentActivity,
   },
   buttonsRow: {
     flexDirection: 'row',
@@ -415,18 +418,18 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     marginRight: 8,
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
   },
   cancelButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
   },
   saveButton: {
     marginLeft: 8,
-    backgroundColor: Colors.primary,
+    backgroundColor: theme.colors.accentActivity,
   },
   saveButtonText: {
     fontSize: 14,

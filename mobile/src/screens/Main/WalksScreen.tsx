@@ -6,7 +6,8 @@ import * as Location from 'expo-location';
 import { useTodayStats } from '../../hooks/useTodayStats';
 import { getProfile, UserProfileApi } from '../../api/me';
 import { suggestWalks, validateWalkAddress, WalkingRouteApi, WalkMode } from '../../api/walks';
-import { Colors } from '../../constants/Colors';
+import { useTheme } from '../../context/ThemeContext';
+import { AppTheme } from '../../constants/Theme';
 
 interface ProgressBarProps {
   current: number;
@@ -14,16 +15,19 @@ interface ProgressBarProps {
   color: string;
 }
 
-const ProgressBar: React.FC<ProgressBarProps> = ({ current, max, color }) => {
+// ProgressBar component removed from top level to be inside component or use props
+const ProgressBar: React.FC<ProgressBarProps & { trackColor: string }> = ({ current, max, color, trackColor }) => {
   const ratio = max > 0 ? Math.min(current / max, 1) : 0;
   return (
-    <View style={styles.progressOuter}>
-      <View style={[styles.progressInner, { width: `${ratio * 100}%`, backgroundColor: color }]} />
+    <View style={{ height: 8, borderRadius: 999, backgroundColor: trackColor, overflow: 'hidden' }}>
+      <View style={{ height: '100%', borderRadius: 999, width: `${ratio * 100}%`, backgroundColor: color }} />
     </View>
   );
 };
 
 export const WalksScreen: React.FC = () => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => createStyles(theme), [theme]);
   const { stats: today } = useTodayStats();
   const [profile, setProfile] = useState<UserProfileApi | null>(null);
   const [stepGoal, setStepGoal] = useState<number>(10000);
@@ -214,7 +218,7 @@ export const WalksScreen: React.FC = () => {
               {stepGoal > 0 ? Math.round((today.steps / stepGoal) * 100) : 0}%
             </Text>
           </View>
-          <ProgressBar current={today.steps} max={stepGoal} color={Colors.primary} />
+          <ProgressBar current={today.steps} max={stepGoal} color={theme.colors.accentActivity} trackColor={theme.colors.surfaceAlt} />
           <Text style={styles.progressText}>
             Осталось: <Text style={styles.progressTextBold}>{stepsNeeded > 0 ? stepsNeeded : 0} шагов</Text> (~
             {approxKm.toFixed(1)} км).
@@ -250,7 +254,7 @@ export const WalksScreen: React.FC = () => {
               <TextInput
                 style={styles.addressInput}
                 placeholder="Введите адрес (дом, офис...)"
-                placeholderTextColor={Colors.textDim}
+                placeholderTextColor={theme.colors.textMuted}
                 value={customAddress}
                 onChangeText={(text) => {
                   setCustomAddress(text);
@@ -264,7 +268,7 @@ export const WalksScreen: React.FC = () => {
                 disabled={!customAddress || isVerifying}
                 onPress={handleVerifyAddress}
               >
-                {isVerifying ? <ActivityIndicator size="small" color={Colors.primary} /> : <Text style={styles.verifyButtonText}>Проверить</Text>}
+                {isVerifying ? <ActivityIndicator size="small" color={theme.colors.accentActivity} /> : <Text style={styles.verifyButtonText}>Проверить</Text>}
               </TouchableOpacity>
             </View>
             {verifiedAddress && (
@@ -299,7 +303,7 @@ export const WalksScreen: React.FC = () => {
 
         {loading && !locError && (
           <View style={styles.loadingBox}>
-            <ActivityIndicator color={Colors.primary} />
+            <ActivityIndicator color={theme.colors.accentActivity} />
             <Text style={styles.loadingText}>
               {activeTab === 'nearby'
                 ? 'Ищу парки и зелёные зоны поблизости...'
@@ -359,10 +363,10 @@ export const WalksScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   safeContainer: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: theme.colors.background,
   },
   container: {
     flex: 1,
@@ -377,10 +381,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   subtitle: {
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
     marginTop: 2,
     fontSize: 13,
   },
@@ -390,19 +394,19 @@ const styles = StyleSheet.create({
   headerStepsValue: {
     fontSize: 20,
     fontWeight: '700',
-    color: Colors.primary,
+    color: theme.colors.accentActivity,
   },
   headerStepsLabel: {
     fontSize: 11,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
   },
   progressCard: {
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
     borderRadius: 16,
     padding: 14,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
   },
   progressHeaderRow: {
     flexDirection: 'row',
@@ -412,18 +416,18 @@ const styles = StyleSheet.create({
   },
   progressTitle: {
     fontSize: 13,
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
     fontWeight: '600',
   },
   progressPercent: {
     fontSize: 13,
-    color: Colors.primary,
+    color: theme.colors.accentActivity,
     fontWeight: '600',
   },
   progressOuter: {
     height: 8,
     borderRadius: 999,
-    backgroundColor: '#333333', // Dark track
+    backgroundColor: theme.colors.surfaceAlt, // Dark track
     overflow: 'hidden',
   },
   progressInner: {
@@ -433,15 +437,15 @@ const styles = StyleSheet.create({
   progressText: {
     marginTop: 6,
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
   },
   progressTextBold: {
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   tabsRow: {
     flexDirection: 'row',
-    backgroundColor: Colors.border,
+    backgroundColor: theme.colors.surfaceAlt,
     borderRadius: 999,
     padding: 4,
     marginBottom: 8,
@@ -453,15 +457,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tabButtonActive: {
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
   },
   tabText: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.textDim,
+    color: theme.colors.textMuted,
   },
   tabTextActive: {
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   addressBlock: {
     marginTop: 8,
@@ -475,13 +479,13 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
     marginRight: 8,
     fontSize: 14,
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   verifyButton: {
     paddingHorizontal: 12,
@@ -497,7 +501,7 @@ const styles = StyleSheet.create({
   verifyButtonText: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.primary,
+    color: theme.colors.accentActivity,
   },
   addressVerifiedBox: {
     marginTop: 6,
@@ -505,20 +509,20 @@ const styles = StyleSheet.create({
     padding: 8,
     backgroundColor: 'rgba(16, 185, 129, 0.1)',
     borderWidth: 1,
-    borderColor: Colors.primary,
+    borderColor: theme.colors.accentActivity,
   },
   addressVerifiedLabel: {
     fontSize: 11,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
   },
   addressVerifiedValue: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   modeHint: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
     marginTop: 4,
     marginBottom: 8,
   },
@@ -541,22 +545,22 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 8,
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
     textAlign: 'center',
   },
   routesTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
     marginBottom: 8,
   },
   routeCard: {
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
     borderRadius: 16,
     padding: 14,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
   },
   routeHeaderRow: {
     flexDirection: 'row',
@@ -568,13 +572,13 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
     marginRight: 8,
   },
   routeDistance: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.info,
+    color: theme.colors.accentSystem,
     backgroundColor: 'rgba(59, 130, 246, 0.15)',
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -597,12 +601,12 @@ const styles = StyleSheet.create({
     color: '#A78BFA',
   },
   routeBadgeOneWay: {
-    backgroundColor: Colors.border,
-    color: Colors.textSecondary,
+    backgroundColor: theme.colors.surfaceAlt,
+    color: theme.colors.textSecondary,
   },
   routeDescription: {
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
     marginTop: 4,
   },
   routeMetaRow: {
@@ -610,7 +614,7 @@ const styles = StyleSheet.create({
   },
   routeMetaItem: {
     fontSize: 11,
-    color: Colors.textDim,
+    color: theme.colors.textMuted,
     marginTop: 2,
   },
   routeButtonsRow: {

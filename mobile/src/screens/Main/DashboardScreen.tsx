@@ -1,14 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Colors } from '../../constants/Colors';
-import { View, Text, StyleSheet, ActivityIndicator, ScrollView, Image, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, ScrollView, Image, TouchableOpacity, ViewStyle, TextStyle } from 'react-native';
 import { AppButton } from '../../components/AppButton';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { SvgProps } from 'react-native-svg';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSteps } from '../../hooks/useSteps';
 import { useTodayStats } from '../../hooks/useTodayStats';
 import { useNotificationsSetup, scheduleWaterReminder, cancelWaterReminders } from '../../hooks/useNotifications';
@@ -18,25 +15,27 @@ import { useAuth } from '../../context/AuthContext';
 import { getProfile, getSettings, SettingsApi, UserProfileApi, updateStepsToday } from '../../api/me';
 import { ProgressRing } from '../../components/ProgressRing';
 import { ProgressBar } from '../../components/ProgressBar';
+import { useTheme } from '../../context/ThemeContext';
+import { AppTheme } from '../../constants/Theme';
 
 type Nav = NativeStackNavigationProp<MainStackParamList, 'Tabs'>;
 
 type FoodFilterType = 'today' | 'week' | 'custom';
 
-
-
 export const DashboardScreen: React.FC = () => {
   useNotificationsSetup();
   const navigation = useNavigation<Nav>();
   const { user } = useAuth();
+  const { theme, mode, toggleTheme } = useTheme(); // Added toggleTheme for demo/testing
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   const { steps } = useSteps(true);
   const { stats, loading, addWater, setStats } = useTodayStats();
   const { items: foodItems, loading: foodLoading, load: loadFood } = useFoodToday();
   const [foodFilterType, setFoodFilterType] = useState<FoodFilterType>('today');
   const [foodDateRange, setFoodDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
   const [selectedFood, setSelectedFood] = useState<(typeof foodItems)[number] | null>(null);
-  const [showStartPicker, setShowStartPicker] = useState(false);
-  const [showEndPicker, setShowEndPicker] = useState(false);
+
   const [profile, setProfile] = useState<UserProfileApi | null>(null);
   const [settings, setSettings] = useState<SettingsApi | null>(null);
   const [showConsumed, setShowConsumed] = useState(false);
@@ -172,7 +171,7 @@ export const DashboardScreen: React.FC = () => {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color={Colors.primary} size="large" />
+        <ActivityIndicator color={theme.colors.accentNutrition} size="large" />
       </View>
     );
   }
@@ -183,7 +182,9 @@ export const DashboardScreen: React.FC = () => {
         {/* Header */}
         <View style={styles.headerRow}>
           <View>
-            <Text style={styles.greeting}>СИСТЕМА В СЕТИ</Text>
+            <TouchableOpacity onPress={toggleTheme}>
+              <Text style={styles.greeting}>СИСТЕМА В СЕТИ ({mode.toUpperCase()})</Text>
+            </TouchableOpacity>
             <Text style={styles.greetingSub}>{user?.name || 'ПОЛЬЗОВАТЕЛЬ'} // ID: {user?.id?.slice(0, 6) || 'N/A'}</Text>
           </View>
           <TouchableOpacity
@@ -214,7 +215,8 @@ export const DashboardScreen: React.FC = () => {
                 radius={80}
                 stroke={18}
                 progress={ringProgress}
-                color={Colors.primary}
+                color={theme.colors.accentNutrition}
+                trackColor={theme.colors.border}
               />
               <View style={styles.ringInner}>
                 <Text style={styles.ringCalories}>
@@ -230,32 +232,32 @@ export const DashboardScreen: React.FC = () => {
           <View style={styles.macrosRow}>
             {/* Protein */}
             <View style={styles.macroCol}>
-              <Text style={[styles.macroLabel, { color: Colors.protein }]}>БЕЛКИ</Text>
+              <Text style={[styles.macroLabel, { color: theme.colors.accentNutrition }]}>БЕЛКИ</Text>
               <Text style={styles.macroValue}>
                 {Math.round(totalProtein)}
                 <Text style={styles.macroGoalText}>/{macroGoals.protein}g</Text>
               </Text>
-              <ProgressBar current={totalProtein} max={macroGoals.protein} color={Colors.protein} />
+              <ProgressBar current={totalProtein} max={macroGoals.protein} color={theme.colors.accentNutrition} />
             </View>
 
             {/* Fat */}
             <View style={styles.macroCol}>
-              <Text style={[styles.macroLabel, { color: Colors.fat }]}>ЖИРЫ</Text>
+              <Text style={[styles.macroLabel, { color: theme.colors.accentActivity }]}>ЖИРЫ</Text>
               <Text style={styles.macroValue}>
                 {Math.round(totalFat)}
                 <Text style={styles.macroGoalText}>/{macroGoals.fat}g</Text>
               </Text>
-              <ProgressBar current={totalFat} max={macroGoals.fat} color={Colors.fat} />
+              <ProgressBar current={totalFat} max={macroGoals.fat} color={theme.colors.accentActivity} />
             </View>
 
             {/* Carbs */}
             <View style={styles.macroCol}>
-              <Text style={[styles.macroLabel, { color: Colors.carbs }]}>УГЛЕВОДЫ</Text>
+              <Text style={[styles.macroLabel, { color: theme.colors.accentSystem }]}>УГЛЕВОДЫ</Text>
               <Text style={styles.macroValue}>
                 {Math.round(totalCarbs)}
                 <Text style={styles.macroGoalText}>/{macroGoals.carbs}g</Text>
               </Text>
-              <ProgressBar current={totalCarbs} max={macroGoals.carbs} color={Colors.carbs} />
+              <ProgressBar current={totalCarbs} max={macroGoals.carbs} color={theme.colors.accentSystem} />
             </View>
           </View>
         </View>
@@ -279,7 +281,7 @@ export const DashboardScreen: React.FC = () => {
               <ProgressBar
                 current={stats.water}
                 max={settings?.waterGoal ?? 2000}
-                color={Colors.info}
+                color={theme.colors.accentSystem}
               />
             </View>
             <View style={styles.row}>
@@ -297,7 +299,7 @@ export const DashboardScreen: React.FC = () => {
           <View style={[styles.cardSmall, { flex: 1, marginLeft: 8 }]}>
             <View style={styles.cardHeaderRowAlt}>
               <Text style={styles.cardTitleSmall}>ВОССТАНОВЛЕНИЕ</Text>
-              {settings?.sleep.wakeAlarmEnabled && <Text style={{ color: Colors.accent }}>⏰ {settings.sleep.wakeTime}</Text>}
+              {settings?.sleep.wakeAlarmEnabled && <Text style={{ color: theme.colors.accentSleep }}>⏰ {settings.sleep.wakeTime}</Text>}
             </View>
             <Text style={styles.statValueBig}>
               {stats.sleepHours}
@@ -307,7 +309,7 @@ export const DashboardScreen: React.FC = () => {
               <ProgressBar
                 current={stats.sleepHours}
                 max={settings?.sleep.targetHours ?? 8}
-                color={Colors.accent}
+                color={theme.colors.accentSleep}
               />
             </View>
             <TouchableOpacity
@@ -330,7 +332,7 @@ export const DashboardScreen: React.FC = () => {
             <ProgressBar
               current={steps}
               max={profile?.dailyStepGoal ?? 10000}
-              color={Colors.secondary}
+              color={theme.colors.accentActivity}
             />
           </View>
           <View style={styles.row}>
@@ -340,7 +342,7 @@ export const DashboardScreen: React.FC = () => {
               onPress={() => (navigation as any).navigate('ActivityLogger')}
             >
               <LinearGradient
-                colors={[Colors.secondary, '#FB923C']} // Orange gradient
+                colors={[theme.colors.accentActivity, '#FB923C']} // Slight gradient for activity
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.trainingButton}
@@ -401,7 +403,7 @@ export const DashboardScreen: React.FC = () => {
           </View>
 
           {foodLoading ? (
-            <ActivityIndicator color={Colors.primary} style={{ marginTop: 20 }} />
+            <ActivityIndicator color={theme.colors.accentNutrition} style={{ marginTop: 20 }} />
           ) : filteredFoodEntries.length === 0 ? (
             <Text style={styles.noMealsText}>NO DATA AVAILABLE</Text>
           ) : (
@@ -437,7 +439,7 @@ export const DashboardScreen: React.FC = () => {
           <View style={styles.foodModalCard}>
             <Text style={styles.foodModalTitle}>{selectedFood.name}</Text>
             <Text style={styles.foodModalCaloriesText}>{Math.round(selectedFood.calories)} KCAL</Text>
-            <Text style={{ color: Colors.textSecondary, marginBottom: 20 }}>
+            <Text style={{ color: theme.colors.textSecondary, marginBottom: 20 }}>
               P: {Math.round(selectedFood.protein)} / F: {Math.round(selectedFood.fat)} / C: {Math.round(selectedFood.carbs)}
             </Text>
             <AppButton title="CLOSE" onPress={() => setSelectedFood(null)} variant="secondary" />
@@ -448,10 +450,10 @@ export const DashboardScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   safeContainer: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: theme.colors.background,
   },
   container: {
     flex: 1,
@@ -461,7 +463,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.background,
+    backgroundColor: theme.colors.background,
   },
   headerRow: {
     flexDirection: 'row',
@@ -473,70 +475,72 @@ const styles = StyleSheet.create({
   greeting: {
     fontSize: 12,
     fontWeight: '700',
-    color: Colors.primary,
+    color: theme.colors.accentNutrition,
     letterSpacing: 2,
     marginBottom: 4,
   },
   greetingSub: {
     fontSize: 14,
-    color: Colors.textSecondary,
-    fontFamily: 'monospace', // Tech look
+    color: theme.colors.textSecondary,
+    fontFamily: 'monospace',
   },
   avatarCircle: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: theme.colors.surfaceAlt,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
   },
   avatarText: {
     fontWeight: '700',
     fontSize: 16,
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   // Card styles
   card: {
-    backgroundColor: Colors.card, // Glass
+    backgroundColor: theme.colors.surface,
     borderRadius: 24,
     padding: 20,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
+    ...theme.effects.shadow,
   },
   cardEmphasis: {
-    backgroundColor: 'rgba(5, 8, 7, 0.8)', // Darker
+    backgroundColor: theme.mode === 'dark' ? 'rgba(5, 8, 7, 0.8)' : theme.colors.surface,
     borderRadius: 32,
     padding: 24,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: Colors.primary, // Neon border
-    shadowColor: Colors.primary,
-    shadowOpacity: 0.15,
+    borderColor: theme.colors.accentNutrition,
+    shadowColor: theme.colors.accentNutrition,
+    shadowOpacity: theme.mode === 'dark' ? 0.15 : 0.05,
     shadowRadius: 10,
     elevation: 5,
   },
   cardSmall: {
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
     borderRadius: 24,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
+    ...theme.effects.shadow,
   },
   cardTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
   cardTitleSmall: {
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.textDim,
+    color: theme.colors.textMuted,
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
@@ -558,7 +562,7 @@ const styles = StyleSheet.create({
   },
   smallText: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
     fontWeight: '600',
   },
   // Ring
@@ -580,13 +584,13 @@ const styles = StyleSheet.create({
   ringCalories: {
     fontSize: 36,
     fontWeight: '800',
-    color: Colors.textPrimary,
-    textShadowColor: Colors.primary,
+    color: theme.colors.textPrimary,
+    textShadowColor: theme.effects.glow ? theme.colors.accentNutrition : 'transparent',
     textShadowRadius: 10,
   },
   ringLabel: {
     fontSize: 10,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
     letterSpacing: 1,
     marginTop: 4,
   },
@@ -606,34 +610,23 @@ const styles = StyleSheet.create({
   },
   macroValue: {
     fontSize: 14,
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
     marginBottom: 6,
     fontWeight: '600',
   },
   macroGoalText: {
     fontSize: 10,
-    color: Colors.textDim,
-  },
-  // Progress Bar
-  progressOuter: {
-    height: 4,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  progressInner: {
-    height: '100%',
-    borderRadius: 2,
+    color: theme.colors.textMuted,
   },
   // Stats
   statValueBig: {
     fontSize: 24,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   statLabel: {
     fontSize: 12,
-    color: Colors.textDim,
+    color: theme.colors.textMuted,
     fontWeight: '400',
   },
   row: {
@@ -645,27 +638,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   miniButton: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: theme.colors.surfaceAlt,
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: theme.colors.border,
   },
   miniButtonText: {
     fontSize: 10,
     fontWeight: '700',
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
   },
   sleepManageButton: {
     marginTop: 12,
     paddingVertical: 8,
     alignItems: 'center',
-    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+    backgroundColor: theme.mode === 'dark' ? 'rgba(139, 92, 246, 0.1)' : 'rgba(139, 92, 246, 0.05)',
     borderRadius: 12,
   },
   sleepManageText: {
-    color: Colors.accent,
+    color: theme.colors.accentSleep,
     fontSize: 11,
     fontWeight: '600',
     textTransform: 'uppercase',
@@ -681,7 +674,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   trainingButtonText: {
-    color: '#000',
+    color: '#000', // Always dark text on orange gradient preferred? Or white?
+    // Spec says "button.primary.background = accent color". 
+    // Here it's a gradient. Let's keep it legible.
     fontWeight: '800',
     fontSize: 12,
     letterSpacing: 0.5,
@@ -691,11 +686,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
     backgroundColor: 'transparent',
   },
   syncButtonText: {
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
     fontSize: 12,
     fontWeight: '600',
   },
@@ -711,24 +706,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: theme.colors.surfaceAlt,
     borderWidth: 1,
     borderColor: 'transparent',
   },
   filterChipSmallActive: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderColor: Colors.primary,
+    backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+    borderColor: theme.colors.accentNutrition,
   },
   filterChipSmallText: {
     fontSize: 11,
-    color: Colors.textDim,
+    color: theme.colors.textMuted,
   },
   filterChipSmallTextActive: {
-    color: Colors.primary,
+    color: theme.colors.accentNutrition,
     fontWeight: '700',
   },
   noMealsText: {
-    color: Colors.textDim,
+    color: theme.colors.textMuted,
     fontSize: 12,
     fontStyle: 'italic',
     textAlign: 'center',
@@ -736,7 +731,7 @@ const styles = StyleSheet.create({
   },
   mealRow: {
     marginBottom: 12,
-    backgroundColor: 'rgba(255,255,255,0.02)',
+    backgroundColor: theme.colors.surface,
     borderRadius: 16,
     padding: 12,
   },
@@ -746,46 +741,47 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   mealName: {
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
     fontSize: 14,
     fontWeight: '600',
   },
   mealMeta: {
-    color: Colors.textDim,
+    color: theme.colors.textMuted,
     fontSize: 11,
     marginTop: 2,
   },
   mealCalories: {
-    color: Colors.primary,
+    color: theme.colors.accentNutrition,
     fontWeight: '700',
     fontSize: 14,
   },
   // Modal
   foodModalOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: Colors.overlay,
+    backgroundColor: theme.colors.overlay,
     justifyContent: 'center',
     padding: 24,
   },
   foodModalCard: {
-    backgroundColor: '#0F1311', // Almost black
+    backgroundColor: theme.colors.background,
     borderRadius: 24,
     padding: 24,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
     alignItems: 'center',
+    elevation: 10,
   },
   foodModalTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
     marginBottom: 8,
     textAlign: 'center',
   },
   foodModalCaloriesText: {
     fontSize: 24,
     fontWeight: '800',
-    color: Colors.primary,
+    color: theme.colors.accentNutrition,
     marginBottom: 16,
   },
 });

@@ -6,13 +6,16 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { MainStackParamList } from '../../navigation/MainStack';
 import { analyzeFoodImage } from '../../api/ai';
 import { createFood } from '../../api/food';
-import { Colors } from '../../constants/Colors';
+import { useTheme } from '../../context/ThemeContext';
+import { AppTheme } from '../../constants/Theme';
 
 export type FoodLoggerProps = NativeStackScreenProps<MainStackParamList, 'FoodLogger'>;
 
 type Step = 'capture' | 'analyzing' | 'review';
 
 export const FoodLoggerScreen: React.FC<FoodLoggerProps> = ({ navigation }) => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => createStyles(theme), [theme]);
   const [step, setStep] = useState<Step>('capture');
   const [imageUri, setImageUri] = useState<string | undefined>();
 
@@ -114,7 +117,7 @@ export const FoodLoggerScreen: React.FC<FoodLoggerProps> = ({ navigation }) => {
   if (step === 'analyzing') {
     return (
       <View style={styles.analyzingContainer}>
-        <ActivityIndicator size="large" color={Colors.primary} />
+        <ActivityIndicator size="large" color={theme.colors.accentNutrition} />
         <Text style={styles.analyzingTitle}>Изучаю фото...</Text>
         <Text style={styles.analyzingSubtitle}>ИИ считает калории и оценивает полезность</Text>
         {imageUri && <Image source={{ uri: imageUri }} style={styles.analyzingImage} />}
@@ -153,7 +156,7 @@ export const FoodLoggerScreen: React.FC<FoodLoggerProps> = ({ navigation }) => {
             style={styles.input}
             value={name}
             onChangeText={setName}
-            placeholderTextColor={Colors.textDim}
+            placeholderTextColor={theme.colors.textMuted}
           />
 
           <View style={styles.macroRow}>
@@ -164,7 +167,7 @@ export const FoodLoggerScreen: React.FC<FoodLoggerProps> = ({ navigation }) => {
                 value={calories}
                 onChangeText={setCalories}
                 keyboardType="numeric"
-                placeholderTextColor={Colors.textDim}
+                placeholderTextColor={theme.colors.textMuted}
               />
             </View>
             <View style={styles.macroCol}>
@@ -174,7 +177,7 @@ export const FoodLoggerScreen: React.FC<FoodLoggerProps> = ({ navigation }) => {
                 value={protein}
                 onChangeText={setProtein}
                 keyboardType="numeric"
-                placeholderTextColor={Colors.textDim}
+                placeholderTextColor={theme.colors.textMuted}
               />
             </View>
           </View>
@@ -187,7 +190,7 @@ export const FoodLoggerScreen: React.FC<FoodLoggerProps> = ({ navigation }) => {
                 value={fat}
                 onChangeText={setFat}
                 keyboardType="numeric"
-                placeholderTextColor={Colors.textDim}
+                placeholderTextColor={theme.colors.textMuted}
               />
             </View>
             <View style={styles.macroCol}>
@@ -197,7 +200,7 @@ export const FoodLoggerScreen: React.FC<FoodLoggerProps> = ({ navigation }) => {
                 value={carbs}
                 onChangeText={setCarbs}
                 keyboardType="numeric"
-                placeholderTextColor={Colors.textDim}
+                placeholderTextColor={theme.colors.textMuted}
               />
             </View>
           </View>
@@ -208,7 +211,7 @@ export const FoodLoggerScreen: React.FC<FoodLoggerProps> = ({ navigation }) => {
             value={rating}
             onChangeText={setRating}
             keyboardType="numeric"
-            placeholderTextColor={Colors.textDim}
+            placeholderTextColor={theme.colors.textMuted}
           />
         </View>
 
@@ -262,13 +265,13 @@ export const FoodLoggerScreen: React.FC<FoodLoggerProps> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   captureContainer: {
     flexGrow: 1,
     padding: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.background,
+    backgroundColor: theme.colors.background,
   },
   captureHeroIconWrapper: {
     marginBottom: 24,
@@ -284,9 +287,9 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 32,
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 4,
@@ -301,12 +304,12 @@ const styles = StyleSheet.create({
   captureTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
     marginBottom: 8,
   },
   captureSubtitle: {
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
     textAlign: 'center',
   },
   captureButtons: {
@@ -319,18 +322,18 @@ const styles = StyleSheet.create({
     padding: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.background,
+    backgroundColor: theme.colors.background,
   },
   analyzingTitle: {
     marginTop: 12,
     fontSize: 18,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   analyzingSubtitle: {
     marginTop: 4,
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
     textAlign: 'center',
   },
   analyzingImage: {
@@ -342,7 +345,7 @@ const styles = StyleSheet.create({
   reviewContainer: {
     padding: 16,
     paddingBottom: 32,
-    backgroundColor: Colors.background,
+    backgroundColor: theme.colors.background,
     minHeight: '100%',
   },
   previewWrapper: {
@@ -365,13 +368,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
     borderRadius: 16,
   },
   ratingBadgeLabel: {
     fontSize: 12,
     fontWeight: '500',
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
     marginRight: 4,
   },
   ratingBadgeValue: {
@@ -388,28 +391,28 @@ const styles = StyleSheet.create({
     color: '#ef4444',
   },
   card: {
-    backgroundColor: Colors.card,
+    backgroundColor: theme.colors.surface,
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
   },
   label: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: theme.colors.textSecondary,
     marginTop: 4,
   },
   input: {
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 8,
     marginTop: 4,
     fontSize: 14,
-    color: Colors.textPrimary,
-    backgroundColor: Colors.background,
+    color: theme.colors.textPrimary,
+    backgroundColor: theme.colors.background,
   },
   macroRow: {
     flexDirection: 'row',
@@ -421,40 +424,40 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   analysisCard: {
-    backgroundColor: Colors.card, // Was light green
+    backgroundColor: theme.colors.surface, // Was light green
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
   },
   analysisTitle: {
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 4,
-    color: Colors.primary,
+    color: theme.colors.accentNutrition,
   },
   analysisText: {
     fontSize: 14,
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   recommendationCard: {
-    backgroundColor: Colors.card, // Was light blue
+    backgroundColor: theme.colors.surface, // Was light blue
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: theme.colors.border,
   },
   recommendationTitle: {
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 4,
-    color: Colors.info,
+    color: theme.colors.accentSystem,
   },
   recommendationText: {
     fontSize: 14,
-    color: Colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   actionsRow: {
     flexDirection: 'row',

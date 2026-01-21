@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, ViewStyle } from 'react-native';
-import { Colors } from '../constants/Colors';
+import { useTheme } from '../context/ThemeContext';
 
 interface ProgressBarProps {
     current: number;
@@ -14,25 +14,34 @@ interface ProgressBarProps {
 export const ProgressBar: React.FC<ProgressBarProps> = ({
     current,
     max,
-    color = Colors.primary,
+    color,
     height = 8,
-    trackColor = 'rgba(255, 255, 255, 0.1)', // Slightly translucent track
+    trackColor,
     style
 }) => {
+    const { theme } = useTheme();
     const ratio = max > 0 ? Math.min(Math.max(current / max, 0), 1) : 0;
 
+    // Defaults with fallback to theme if prop not provided
+    const finalColor = color || theme.colors.accentNutrition;
+    const finalTrackColor = trackColor || theme.colors.border; // Or a specific track token
+
+    const shadowStyle = theme.effects.glow ? {
+        shadowColor: finalColor,
+        shadowOpacity: 0.5,
+        shadowRadius: 6,
+        elevation: 3,
+    } : {};
+
     return (
-        <View style={[styles.track, { height, backgroundColor: trackColor }, style]}>
+        <View style={[styles.track, { height, backgroundColor: finalTrackColor }, style]}>
             <View
                 style={[
                     styles.progress,
                     {
                         width: `${ratio * 100}%`,
-                        backgroundColor: color,
-                        shadowColor: color,
-                        shadowOpacity: 0.5,
-                        shadowRadius: 6,
-                        elevation: 3,
+                        backgroundColor: finalColor,
+                        ...shadowStyle,
                     }
                 ]}
             />
@@ -44,7 +53,7 @@ const styles = StyleSheet.create({
     track: {
         width: '100%',
         borderRadius: 999,
-        overflow: 'hidden', // Ensures inner bar doesn't overflow corners
+        overflow: 'hidden',
     },
     progress: {
         height: '100%',
