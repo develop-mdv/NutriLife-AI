@@ -12,6 +12,7 @@ import {
   Modal,
   Platform,
   Alert,
+  ActionSheetIOS,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
@@ -110,6 +111,7 @@ export const ProfileScreen: React.FC = () => {
   const [pendingLogout, setPendingLogout] = useState(false);
   const [pendingNavAction, setPendingNavAction] = useState<any | null>(null);
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
+  const [showAvatarModal, setShowAvatarModal] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -165,6 +167,54 @@ export const ProfileScreen: React.FC = () => {
     } finally {
       setSaving(false);
     }
+  };
+
+  const pickImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Ошибка', 'Нужен доступ к галерее для смены фото');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0].base64) {
+        const base64Img = `data:image/jpeg;base64,${result.assets[0].base64}`;
+
+        // Optimistically update UI
+        if (profile) {
+          setProfile({ ...profile, avatarUri: base64Img });
+        }
+
+        // Save to backend immediately
+        await updateProfile({ avatarUri: base64Img });
+      }
+    } catch (e) {
+      console.log('Error picking image', e);
+      Alert.alert('Ошибка', 'Не удалось загрузить изображение');
+    }
+  };
+
+  const removeAvatar = async () => {
+    if (!profile) return;
+
+    // Optimistically update
+    setProfile({ ...profile, avatarUri: undefined });
+
+    // Save to backend
+    // Sending empty string to clear the field on server
+    await updateProfile({ avatarUri: '' } as any);
+  };
+
+  const handleAvatarPress = () => {
+    setShowAvatarModal(true);
   };
 
   const reloadProfileAndRoadmap = async () => {
@@ -460,13 +510,20 @@ export const ProfileScreen: React.FC = () => {
         {/* Header Card */}
         <View style={styles.headerCard}>
           <TouchableOpacity
-            style={styles.avatarCircle}
+            style={[styles.avatarCircle, profile.avatarUri && { backgroundColor: 'transparent', borderWidth: 0 }]}
             activeOpacity={0.8}
-            onPress={() => setShowGoalPicker(true)}
+            onPress={handleAvatarPress}
           >
-            <Text style={styles.avatarText}>
-              {profile.avatarEmoji || (profile.name || user?.name || 'N')[0]?.toUpperCase()}
-            </Text>
+            {profile.avatarUri ? (
+              <Image
+                source={{ uri: profile.avatarUri }}
+                style={{ width: 64, height: 64, borderRadius: 32 }}
+              />
+            ) : (
+              <Text style={styles.avatarText}>
+                {profile.avatarEmoji || (profile.name || user?.name || 'N')[0]?.toUpperCase()}
+              </Text>
+            )}
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
             <Text style={styles.name}>{profile.name || user?.name}</Text>
@@ -1369,33 +1426,100 @@ export const ProfileScreen: React.FC = () => {
                 </View>
               </TouchableOpacity>
             ))}
-            {/* Блок выбора аватара-emoji */}
-            <View style={{ marginTop: 12 }}>
-              <Text style={[styles.goalOverlaySubtitle, { marginBottom: 8 }]}>Выберите аватар:</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' }}>
-                {['🧑‍💻', '🏃‍♂️', '🏃‍♀️', '💪', '🥦', '🧘‍♀️', '🚴‍♂️', '🌞'].map((emoji) => (
-                  <TouchableOpacity
-                    key={emoji}
-                    style={{
-                      padding: 8,
-                      margin: 4,
-                      borderRadius: 999,
-                      borderWidth: profile.avatarEmoji === emoji ? 2 : 1,
-                      borderColor: profile.avatarEmoji === emoji ? theme.colors.accentNutrition : theme.colors.border,
-                    }}
-                    onPress={() => {
-                      const updated: UserProfileApi = { ...profile, avatarEmoji: emoji };
-                      setProfile(updated);
-                      setHasUnsavedChanges(true);
-                    }}
-                  >
-                    <Text style={{ fontSize: 24 }}>{emoji}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
+            {/* Блок выбора аватара-emoji удален отсюда и перенесен в отдельное окно */}
             <View style={{ marginTop: 12 }}>
               <AppButton title="Закрыть" onPress={() => setShowGoalPicker(false)} />
+            </View>
+          </View>
+        </View>
+      )}
+
+      {showAvatarModal && (
+        <View style={styles.planOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFillObject}
+            activeOpacity={1}
+            onPress={() => setShowAvatarModal(false)}
+          />
+          <View style={styles.goalOverlayCard}>
+            <Text style={styles.goalOverlayTitle}>Сменить аватар</Text>
+            <Text style={styles.goalOverlaySubtitle}>Выберите фото или эмодзи</Text>
+
+            <View style={{ gap: 12, marginTop: 8 }}>
+              {/* Photo Options */}
+              <AppButton
+                title="Загрузить фото"
+                onPress={() => {
+                  pickImage();
+                  setShowAvatarModal(false);
+                }}
+              />
+
+              {profile?.avatarUri && (
+                <TouchableOpacity
+                  style={{
+                    paddingVertical: 12,
+                    alignItems: 'center',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    borderRadius: 16,
+                  }}
+                  onPress={() => {
+                    removeAvatar();
+                    setShowAvatarModal(false);
+                  }}
+                >
+                  <Text style={{ color: '#ef4444', fontWeight: '700', fontSize: 14 }}>
+                    Удалить фото
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <View style={{ height: 1, backgroundColor: theme.colors.border, marginVertical: 20 }} />
+
+            {/* Emoji Options */}
+            <Text style={[styles.goalOverlaySubtitle, { marginBottom: 12, textAlign: 'center' }]}>
+              или выберите эмодзи
+            </Text>
+
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 }}>
+              {['🧑‍💻', '🏃‍♂️', '🏃‍♀️', '💪', '🥦', '🧘‍♀️', '🚴‍♂️', '🌞', '👽', '🦄', '😺', '🦊'].map((emoji) => (
+                <TouchableOpacity
+                  key={emoji}
+                  style={{
+                    width: 48,
+                    height: 48,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: 24,
+                    backgroundColor: profile?.avatarEmoji === emoji ? theme.colors.surfaceAlt : 'transparent',
+                    borderWidth: profile?.avatarEmoji === emoji ? 1 : 0,
+                    borderColor: theme.colors.accentNutrition,
+                  }}
+                  onPress={() => {
+                    // Updating emoji clears the photo URI to prioritize emoji if user selects one? 
+                    // Or should we keep both but prioritize one?
+                    // Typically if user picks emoji, they want to see emoji.
+                    // Let's clear URI if emoji is picked, or just set emoji and let URI logic handle precedence (URI > Emoji currently).
+                    // If URI > Emoji, and user picks Emoji, we must clear URI to show Emoji.
+                    const updated = { ...profile, avatarEmoji: emoji, avatarUri: undefined };
+                    setProfile(updated as any);
+
+                    // Direct save or strict save button?
+                    // "onSaveSettings" is manual save. But avatar usually updates instantly.
+                    // Let's do instant update for emoji too like we did for Photo.
+                    updateProfile({ avatarEmoji: emoji, avatarUri: '' } as any).catch(e => console.log(e));
+
+                    setShowAvatarModal(false);
+                  }}
+                >
+                  <Text style={{ fontSize: 24 }}>{emoji}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={{ marginTop: 24 }}>
+              <AppButton title="Отмена" onPress={() => setShowAvatarModal(false)} variant="secondary" />
             </View>
           </View>
         </View>
@@ -1445,6 +1569,15 @@ export const ProfileScreen: React.FC = () => {
     </SafeAreaView>
   );
 };
+
+// --- Styles for Avatar Modal ---
+// We'll add this to the main stylesheet or keep it inline if simple, but better in createStyles
+// For simplicity in this edit, I will render the Modal JSX before SafeAreaView close, using existing styles + new ones.
+
+/* 
+   Place this new Modal block inside the return, before </SafeAreaView>. 
+   I will use the `multi_replace` to insert it after the `showGoalPicker` block.
+*/
 
 const createStyles = (theme: AppTheme) => StyleSheet.create({
   safeContainer: {

@@ -16,6 +16,7 @@ export interface IProfile extends Document {
   healthConditions?: string;
   // Простой аватар в виде emoji-иконки (не требует загрузки файлов)
   avatarEmoji?: string;
+  avatarUri?: string;
 }
 
 const ProfileSchema = new Schema<IProfile>({
@@ -33,6 +34,8 @@ const ProfileSchema = new Schema<IProfile>({
   preferences: String,
   healthConditions: String,
   avatarEmoji: String,
+  // Base64 encoded image
+  avatarUri: String,
 });
 
 export const Profile = mongoose.model<IProfile>('Profile', ProfileSchema);

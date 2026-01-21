@@ -28,6 +28,7 @@ export interface UserProfileApi {
   healthConditions?: string;
   // Простой аватар в виде emoji-иконки (хранится на сервере вместе с профилем)
   avatarEmoji?: string;
+  avatarUri?: string;
 }
 
 export interface ReminderConfigApi {

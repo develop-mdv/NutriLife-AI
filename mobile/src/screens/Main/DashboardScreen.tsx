@@ -188,13 +188,20 @@ export const DashboardScreen: React.FC = () => {
             <Text style={styles.greetingSub}>{user?.name || 'ПОЛЬЗОВАТЕЛЬ'} // ID: {user?.id?.slice(0, 6) || 'N/A'}</Text>
           </View>
           <TouchableOpacity
-            style={styles.avatarCircle}
+            style={[styles.avatarCircle, profile?.avatarUri && { backgroundColor: 'transparent', borderWidth: 0 }]}
             activeOpacity={0.8}
             onPress={() => (navigation as any).navigate('Profile')}
           >
-            <Text style={styles.avatarText}>
-              {(user?.name || 'N')[0]?.toUpperCase()}
-            </Text>
+            {profile?.avatarUri ? (
+              <Image
+                source={{ uri: profile.avatarUri }}
+                style={{ width: 40, height: 40, borderRadius: 20 }}
+              />
+            ) : (
+              <Text style={styles.avatarText}>
+                {profile?.avatarEmoji || (user?.name || 'N')[0]?.toUpperCase()}
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
 
