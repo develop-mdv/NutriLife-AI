@@ -9,6 +9,10 @@ NutriLife AI is an intelligent mobile application designed to help users track t
 - **Navigation**: React Navigation v7
 - **State Management**: React Context & Hooks
 - **UI/Animations**:
+<<<<<<< HEAD
+=======
+  - `react-native-reanimated` for performant animations
+>>>>>>> f52307c96be0923306f44d787f95c143ab2acef3
   - `moti` for simple declarative animations
   - `expo-linear-gradient` for styling
   - `react-native-svg` for vector graphics
@@ -33,6 +37,10 @@ The source code is located in the `src` directory:
 
 The application features a modern, premium design system focused on:
 - **Glassmorphism & Gradients**: Use of `expo-linear-gradient` and translucent elements (glass headers, overlays) for a depth effect.
+<<<<<<< HEAD
+=======
+- **Animations**: Smooth transitions and micro-interactions powered by `react-native-reanimated`.
+>>>>>>> f52307c96be0923306f44d787f95c143ab2acef3
 - **Theming**: Full support for Light and Dark modes via a custom `ThemeContext`.
 - **Custom UI**: Bespoke components like `ProgressRing`, `AnimatedCard`, and a custom Tab Bar with a floating action button.
 
