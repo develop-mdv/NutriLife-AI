@@ -33,7 +33,7 @@ jobs:
             docker tag nutrilife-api:latest nutrilife-api:rollback 2>/dev/null || true
 
             echo "==> Building and starting containers..."
-            docker-compose up -d --build
+            docker compose up -d --build
 
             echo "==> Waiting for health check..."
             sleep 5
@@ -43,9 +43,9 @@ jobs:
               docker image rm nutrilife-api:rollback 2>/dev/null || true
             else
               echo "==> Health check failed! Rolling back..."
-              docker-compose down
+              docker compose down
               docker tag nutrilife-api:rollback nutrilife-api:latest 2>/dev/null || true
-              docker-compose up -d
+              docker compose up -d
               echo "==> Rollback complete."
               exit 1
             fi
