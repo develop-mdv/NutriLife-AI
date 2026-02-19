@@ -5,3 +5,7 @@ docker-compose.yml
 .git
 .gitignore
 .env
+.env.example
+.env.local
+dist
+*.md

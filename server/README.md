@@ -11,6 +11,7 @@ The backend server for NutriLife AI, built with Node.js and Express. It powers t
 - **AI Integration**: Google Generative AI SDK (Gemini 2.5 Flash)
 - **Language**: TypeScript
 - **Containerization**: Docker & Docker Compose
+- **CI/CD**: GitHub Actions
 
 ## 📂 Project Structure
 
@@ -30,66 +31,135 @@ The server integrates with **Google Gemini 2.5 Flash** to provide:
 - **Context-Aware Chat**: The AI assistant has access to the user's profile, health goals, recent meals, and daily stats to provide personalized advice.
 - **Food Analysis**: Endpoint accepts food images (Base64), identifies the dish, and estimates calories/macros (B/F/C) along with a health rating.
 
-## 🚀 Deployment & Updates
+## 🧑‍💻 Локальная разработка
 
 ### Prerequisites
 
-- [Docker](https://www.docker.com/) and Docker Compose installed on the server.
-- A **MongoDB** instance (or use the one provided in `docker-compose`).
-- A **Google Gemini API Key**.
+- [Docker](https://www.docker.com/) и Docker Compose
+- Google Gemini API Key
 
 ### Environment Variables
 
-Create a `.env` file in the `server` directory with the following variables:
+Создайте файл `.env` в директории `server/`:
 
 ```ini
 PORT=4000
-# Connection string to MongoDB (use 'mongo' hostname if using docker-compose)
 MONGO_URI=mongodb://mongo:27017/nutrilife
-# Secret key for JWT signing
 JWT_SECRET=your_super_secret_jwt_key
-# API Key for Google Gemini
 GEMINI_API_KEY=your_gemini_api_key
 ```
 
-### Deploying with Docker
+### Запуск в dev-режиме (hot-reload)
 
-The easiest way to run the server (and a local MongoDB database) is using Docker Compose.
+```bash
+cd server
+npm install
+npm run dev
+```
 
-1.  **Build and Start**:
+Сервер запустится с `ts-node-dev` и будет автоматически перезапускаться при изменениях в `src/`.
+
+---
+
+## 🚀 Production-деплой на VPS
+
+### Первоначальная настройка сервера
+
+1. **Установите Docker и Docker Compose** на VPS.
+
+2. **Клонируйте репозиторий**:
     ```bash
-    docker-compose up --build -d
-    ```
-    This command builds the image and runs the containers in detached mode (`-d`).
-
-2.  **View Logs**:
-    ```bash
-    docker-compose logs -f
-    ```
-
-3.  **Stop Server**:
-    ```bash
-    docker-compose down
-    ```
-
-### Updating the Server
-
-When you have made changes to the code and pushed them to your server (e.g., via `git pull`), follow these steps to update the running application:
-
-1.  **Pull latest changes** (if using git):
-    ```bash
-    git pull origin main
+    git clone <your-repo-url> /opt/nutrilife
+    cd /opt/nutrilife/server
     ```
 
-2.  **Rebuild and Restart**:
-    Docker Compose will detect changes, rebuild the image, and recreate the container with zero downtime (mostly).
-    ```bash
-    docker-compose up --build -d
+3. **Создайте `.env`** с production-значениями:
+    ```ini
+    PORT=4000
+    MONGO_URI=mongodb://mongo:27017/nutrilife
+    JWT_SECRET=<сгенерируйте_надёжный_ключ>
+    GEMINI_API_KEY=<ваш_gemini_api_key>
     ```
 
-3.  **Verify**:
-    Check if the container is running and healthy:
+4. **Запустите**:
     ```bash
+    docker compose up -d --build
+    ```
+
+5. **Проверьте**:
+    ```bash
+    # Статус контейнеров
     docker ps
-    docker-compose logs -f --tail=50
+
+    # Health check
+    curl http://localhost:4000/api/health
+    # Ожидаемый ответ: {"ok":true}
+
+    # Логи
+    docker compose logs -f --tail=50
     ```
+
+### Ручное обновление
+
+```bash
+cd /opt/nutrilife
+git pull origin main
+cd server
+docker compose up -d --build
+```
+
+---
+
+## 🔄 CI/CD — Автоматический деплой
+
+Проект настроен на **автоматический деплой** серверной части при пуше в ветку `main`. Workflow запускается **только при изменениях в директории `server/`**.
+
+### Что происходит при деплое
+
+1. GitHub Actions подключается к VPS по SSH.
+2. Выполняет `git pull origin main`.
+3. Пересобирает и поднимает контейнеры (`docker compose up -d --build`).
+4. Проверяет health check (`/api/health`).
+5. При ошибке — **автоматический откат** на предыдущую версию образа.
+
+### Настройка GitHub Secrets
+
+Перейдите в **GitHub → Settings → Secrets and variables → Actions** и добавьте:
+
+| Secret | Описание | Пример |
+|---|---|---|
+| `VPS_HOST` | IP-адрес или домен VPS | `123.45.67.89` |
+| `VPS_USER` | SSH-пользователь | `deploy` |
+| `VPS_SSH_KEY` | Приватный SSH-ключ (содержимое файла) | `-----BEGIN OPENSSH...` |
+| `VPS_REPO_PATH` | Путь к репозиторию на VPS | `/opt/nutrilife` |
+
+### Генерация SSH-ключа для деплоя
+
+На **локальной машине**:
+
+```bash
+ssh-keygen -t ed25519 -C "github-deploy" -f ~/.ssh/deploy_key
+```
+
+На **VPS** добавьте публичный ключ:
+
+```bash
+cat deploy_key.pub >> ~/.ssh/authorized_keys
+```
+
+Содержимое **приватного** ключа (`deploy_key`) скопируйте в GitHub Secret `VPS_SSH_KEY`.
+
+### Файл workflow
+
+Расположение: `.github/workflows/deploy-server.yml` (в корне монорепозитория).
+
+Деплой запускается автоматически. Статус можно отслеживать на вкладке **Actions** в GitHub.
+
+---
+
+## 📁 Docker-файлы
+
+| Файл | Назначение |
+|---|---|
+| `Dockerfile` | Production — multi-stage build (компиляция TS → запуск `node`) |
+| `docker-compose.yml` | Production compose с healthcheck и restart policy |

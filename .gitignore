@@ -15,6 +15,14 @@ dist
 .idea
 .vscode
 
+# SSH / Deploy keys
+*.pem
+*.key
+deploy_key
+deploy_key.pub
+id_rsa
+id_ed25519
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

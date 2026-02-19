@@ -10,7 +10,11 @@ const STEPS_DATE_KEY = 'steps_date';
 export const useSteps = (enabled: boolean) => {
   const [steps, setSteps] = useState(0);
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
+  const [permissionStatus, setPermissionStatus] = useState<string | null>(null);
   const stepsRef = useRef(0);
+  // На Android: храним базовые шаги (из AsyncStorage), 
+  // чтобы прибавлять к ним шаги с момента подписки
+  const baseStepsRef = useRef(0);
 
   useEffect(() => {
     if (!enabled) return;
@@ -19,6 +23,34 @@ export const useSteps = (enabled: boolean) => {
 
     const subscribe = async () => {
       try {
+        // Сначала проверяем и запрашиваем разрешения (важно для Android 10+)
+        if (Platform.OS === 'android') {
+          const permResponse = await Pedometer.getPermissionsAsync();
+          console.log('Pedometer permission status:', permResponse.status);
+          
+          if (permResponse.status !== 'granted') {
+            const requestResponse = await Pedometer.requestPermissionsAsync();
+            console.log('Pedometer permission request result:', requestResponse.status);
+            setPermissionStatus(requestResponse.status);
+            
+            if (requestResponse.status !== 'granted') {
+              console.log('Pedometer: разрешение не предоставлено');
+              setIsAvailable(false);
+              // Загружаем шаги с сервера
+              try {
+                const res = await getTodayStats();
+                if (res.data?.steps) {
+                  setSteps(res.data.steps);
+                  stepsRef.current = res.data.steps;
+                }
+              } catch {}
+              return;
+            }
+          } else {
+            setPermissionStatus(permResponse.status);
+          }
+        }
+
         const available = await Pedometer.isAvailableAsync();
         setIsAvailable(available);
         if (!available) {
@@ -63,15 +95,23 @@ export const useSteps = (enabled: boolean) => {
             const res = await getTodayStats();
             if (res.data?.steps && res.data.steps > baseSteps) {
               baseSteps = res.data.steps;
+              // Обновляем локальное хранилище
+              await AsyncStorage.setItem(STEPS_STORAGE_KEY, String(baseSteps));
             }
           } catch {}
 
+          // Сохраняем базовые шаги (это шаги ДО подписки на watchStepCount)
+          baseStepsRef.current = baseSteps;
           setSteps(baseSteps);
           stepsRef.current = baseSteps;
 
+          // ВАЖНО: res.steps в watchStepCount - это накопленные шаги С МОМЕНТА ПОДПИСКИ,
+          // а не инкремент. Поэтому мы просто добавляем их к базовым шагам.
           subscription = Pedometer.watchStepCount((res) => {
-            const newSteps = stepsRef.current + (res.steps || 0);
+            // res.steps - шаги с момента подписки (кумулятивное значение)
+            const newSteps = baseStepsRef.current + (res.steps || 0);
             setSteps(newSteps);
+            stepsRef.current = newSteps;
             // Сохраняем в AsyncStorage
             AsyncStorage.setItem(STEPS_STORAGE_KEY, String(newSteps)).catch(() => {});
           });
@@ -126,5 +166,5 @@ export const useSteps = (enabled: boolean) => {
     })();
   }, [steps, enabled]);
 
-  return { steps, isAvailable };
+  return { steps, isAvailable, permissionStatus };
 };
