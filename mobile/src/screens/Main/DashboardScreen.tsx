@@ -17,10 +17,12 @@ import { ProgressRing } from '../../components/ProgressRing';
 import { ProgressBar } from '../../components/ProgressBar';
 import { useTheme } from '../../context/ThemeContext';
 import { AppTheme } from '../../constants/Theme';
+import { NutritionStatusCard } from '../../features/dashboard/components/NutritionStatusCard';
+import { WaterAndSleepRow } from '../../features/dashboard/components/WaterAndSleepRow';
+import { ActivityCard } from '../../features/dashboard/components/ActivityCard';
+import { MainFoodLog, FoodFilterType } from '../../features/dashboard/components/MainFoodLog';
 
 type Nav = NativeStackNavigationProp<MainStackParamList, 'Tabs'>;
-
-type FoodFilterType = 'today' | 'week' | 'custom';
 
 export const DashboardScreen: React.FC = () => {
   useNotificationsSetup();
@@ -34,7 +36,6 @@ export const DashboardScreen: React.FC = () => {
   const { items: foodItems, loading: foodLoading, load: loadFood } = useFoodToday();
   const [foodFilterType, setFoodFilterType] = useState<FoodFilterType>('today');
   const [foodDateRange, setFoodDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
-  const [selectedFood, setSelectedFood] = useState<(typeof foodItems)[number] | null>(null);
 
   const [profile, setProfile] = useState<UserProfileApi | null>(null);
   const [settings, setSettings] = useState<SettingsApi | null>(null);
@@ -206,167 +207,36 @@ export const DashboardScreen: React.FC = () => {
         </View>
 
         {/* --- MAIN DASHBOARD (NUTRITION) --- */}
-        <View style={styles.cardEmphasis}>
-          <View style={styles.cardHeaderRow}>
-            <Text style={styles.cardTitle}>СТАТУС ПИТАНИЯ</Text>
-            <Text style={styles.smallText}>{caloriesConsumedToday} / {calorieGoal} ККАЛ</Text>
-          </View>
-
-          <View style={styles.ringAndTextRow}>
-            <TouchableOpacity
-              style={styles.ringWrapper}
-              activeOpacity={0.8}
-              onPress={() => setShowConsumed((prev) => !prev)}
-            >
-              <ProgressRing
-                radius={80}
-                stroke={18}
-                progress={ringProgress}
-                color={theme.colors.accentNutrition}
-                trackColor={theme.colors.border}
-              />
-              <View style={styles.ringInner}>
-                <Text style={styles.ringCalories}>
-                  {showConsumed ? caloriesConsumedToday : caloriesLeftToday}
-                </Text>
-                <Text style={styles.ringLabel}>
-                  {showConsumed ? 'ПОТРЕБЛЕНО' : 'ОСТАЛОСЬ'}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.macrosRow}>
-            {/* Protein */}
-            <View style={styles.macroCol}>
-              <Text style={[styles.macroLabel, { color: theme.colors.accentNutrition }]}>БЕЛКИ</Text>
-              <Text style={styles.macroValue}>
-                {Math.round(totalProtein)}
-                <Text style={styles.macroGoalText}>/{macroGoals.protein}g</Text>
-              </Text>
-              <ProgressBar current={totalProtein} max={macroGoals.protein} color={theme.colors.accentNutrition} />
-            </View>
-
-            {/* Fat */}
-            <View style={styles.macroCol}>
-              <Text style={[styles.macroLabel, { color: theme.colors.accentActivity }]}>ЖИРЫ</Text>
-              <Text style={styles.macroValue}>
-                {Math.round(totalFat)}
-                <Text style={styles.macroGoalText}>/{macroGoals.fat}g</Text>
-              </Text>
-              <ProgressBar current={totalFat} max={macroGoals.fat} color={theme.colors.accentActivity} />
-            </View>
-
-            {/* Carbs */}
-            <View style={styles.macroCol}>
-              <Text style={[styles.macroLabel, { color: theme.colors.accentSystem }]}>УГЛЕВОДЫ</Text>
-              <Text style={styles.macroValue}>
-                {Math.round(totalCarbs)}
-                <Text style={styles.macroGoalText}>/{macroGoals.carbs}g</Text>
-              </Text>
-              <ProgressBar current={totalCarbs} max={macroGoals.carbs} color={theme.colors.accentSystem} />
-            </View>
-          </View>
-        </View>
+        <NutritionStatusCard
+          calorieGoal={calorieGoal}
+          caloriesConsumedToday={caloriesConsumedToday}
+          caloriesLeftToday={caloriesLeftToday}
+          ringProgress={ringProgress}
+          showConsumed={showConsumed}
+          setShowConsumed={setShowConsumed}
+          totalProtein={totalProtein}
+          totalFat={totalFat}
+          totalCarbs={totalCarbs}
+          macroGoals={macroGoals}
+        />
 
         {/* --- WATER & SLEEP --- */}
-        <View style={styles.rowBetween}>
-          {/* Water Card */}
-          <View style={[styles.cardSmall, { flex: 1, marginRight: 8 }]}>
-            <View style={styles.cardHeaderRowAlt}>
-              <View style={styles.cardTitleRowLeft}>
-                <Text style={styles.cardTitleSmall}>ГИДРАТАЦИЯ</Text>
-              </View>
-              <TouchableOpacity onPress={onToggleWaterReminders}>
-                <Text style={{ fontSize: 18 }}>{waterRemindersEnabled ? '🔔' : '🔕'}</Text>
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.statValueBig}>{stats.water}
-              <Text style={styles.statLabel}> / {(settings?.waterGoal ?? 2000)} ml</Text>
-            </Text>
-            <View style={{ marginVertical: 8 }}>
-              <ProgressBar
-                current={stats.water}
-                max={settings?.waterGoal ?? 2000}
-                color={theme.colors.accentSystem}
-              />
-            </View>
-            <View style={styles.row}>
-              <TouchableOpacity style={styles.miniButton} onPress={() => addWater(250)}>
-                <Text style={styles.miniButtonText}>+250</Text>
-              </TouchableOpacity>
-              <View style={{ width: 8 }} />
-              <TouchableOpacity style={styles.miniButton} onPress={() => addWater(500)}>
-                <Text style={styles.miniButtonText}>+500</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Sleep Card */}
-          <View style={[styles.cardSmall, { flex: 1, marginLeft: 8 }]}>
-            <View style={styles.cardHeaderRowAlt}>
-              <Text style={styles.cardTitleSmall}>ВОССТАНОВЛЕНИЕ</Text>
-              {settings?.sleep.wakeAlarmEnabled && <Text style={{ color: theme.colors.accentSleep }}>⏰ {settings.sleep.wakeTime}</Text>}
-            </View>
-            <Text style={styles.statValueBig}>
-              {stats.sleepHours}
-              <Text style={styles.statLabel}> / {settings?.sleep.targetHours ?? 8} hr</Text>
-            </Text>
-            <View style={{ marginVertical: 8 }}>
-              <ProgressBar
-                current={stats.sleepHours}
-                max={settings?.sleep.targetHours ?? 8}
-                color={theme.colors.accentSleep}
-              />
-            </View>
-            <TouchableOpacity
-              style={styles.sleepManageButton}
-              activeOpacity={0.8}
-              onPress={() => navigation.navigate('Sleep')}
-            >
-              <Text style={styles.sleepManageText}>Управление сном</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        <WaterAndSleepRow
+          stats={stats}
+          settings={settings}
+          waterRemindersEnabled={waterRemindersEnabled}
+          onToggleWaterReminders={onToggleWaterReminders}
+          addWater={addWater}
+          onManageSleep={() => navigation.navigate('Sleep')}
+        />
 
         {/* --- ACTIVITY --- */}
-        <View style={styles.card}>
-          <View style={styles.cardHeaderRowAlt}>
-            <Text style={styles.cardTitleSmall}>АКТИВНОСТЬ</Text>
-            <Text style={styles.smallText}>{steps} / {(profile?.dailyStepGoal ?? 10000)}</Text>
-          </View>
-          <View style={{ marginBottom: 16 }}>
-            <ProgressBar
-              current={steps}
-              max={profile?.dailyStepGoal ?? 10000}
-              color={theme.colors.accentActivity}
-            />
-          </View>
-          <View style={styles.row}>
-            <TouchableOpacity
-              style={[styles.trainingButtonWrapper, { flex: 1 }]}
-              activeOpacity={0.9}
-              onPress={() => (navigation as any).navigate('ActivityLogger')}
-            >
-              <LinearGradient
-                colors={[theme.colors.accentActivity, '#FB923C']} // Slight gradient for activity
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.trainingButton}
-              >
-                <Text style={styles.trainingButtonText}>ДОБАВИТЬ АКТИВНОСТЬ</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-            <View style={{ width: 12 }} />
-            <TouchableOpacity
-              style={styles.syncButton}
-              activeOpacity={0.85}
-              onPress={onSyncSteps}
-            >
-              <Text style={styles.syncButtonText}>СИНХР.</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        <ActivityCard
+          steps={steps}
+          dailyStepGoal={profile?.dailyStepGoal ?? 10000}
+          onAddActivity={() => (navigation as any).navigate('ActivityLogger')}
+          onSyncSteps={onSyncSteps}
+        />
 
         {/* --- FOOD LOG BUTTON --- */}
         <View style={{ marginVertical: 8 }}>
@@ -378,81 +248,13 @@ export const DashboardScreen: React.FC = () => {
         </View>
 
         {/* --- HISTORY --- */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>DATA LOGS</Text>
-          <View style={styles.filterRowSmall}>
-            {/* Simple filter tabs implementation */}
-            {(
-              [
-                { key: 'today', label: '24H' },
-                { key: 'week', label: '7D' },
-                { key: 'custom', label: '···' },
-              ] as { key: FoodFilterType; label: string }[]
-            ).map((f) => (
-              <TouchableOpacity
-                key={f.key}
-                style={[
-                  styles.filterChipSmall,
-                  foodFilterType === f.key && styles.filterChipSmallActive,
-                ]}
-                onPress={() => setFoodFilterType(f.key)}
-              >
-                <Text
-                  style={[
-                    styles.filterChipSmallText,
-                    foodFilterType === f.key && styles.filterChipSmallTextActive,
-                  ]}
-                >
-                  {f.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {foodLoading ? (
-            <ActivityIndicator color={theme.colors.accentNutrition} style={{ marginTop: 20 }} />
-          ) : filteredFoodEntries.length === 0 ? (
-            <Text style={styles.noMealsText}>NO DATA AVAILABLE</Text>
-          ) : (
-            filteredFoodEntries.map((item) => {
-              const ts = typeof item.timestamp === 'number' ? item.timestamp : new Date(item.timestamp).getTime();
-              return (
-                <TouchableOpacity
-                  key={String(item.id ?? item.timestamp)}
-                  style={styles.mealRow}
-                  activeOpacity={0.8}
-                  onPress={() => setSelectedFood(item)}
-                >
-                  <View style={styles.mealRowInner}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.mealName}>{item.name}</Text>
-                      <Text style={styles.mealMeta}>
-                        {new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </Text>
-                    </View>
-                    <Text style={styles.mealCalories}>{Math.round(item.calories)} CAL</Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })
-          )}
-        </View>
-
+        <MainFoodLog
+          foodLoading={foodLoading}
+          filteredFoodEntries={filteredFoodEntries}
+          foodFilterType={foodFilterType}
+          setFoodFilterType={setFoodFilterType}
+        />
       </ScrollView>
-
-      {/* MODAL (Simplified for Glassmorphism) */}
-      {selectedFood && (
-        <View style={styles.foodModalOverlay}>
-          <View style={styles.foodModalCard}>
-            <Text style={styles.foodModalTitle}>{selectedFood.name}</Text>
-            <Text style={styles.foodModalCaloriesText}>{Math.round(selectedFood.calories)} KCAL</Text>
-            <Text style={{ color: theme.colors.textSecondary, marginBottom: 20 }}>
-              P: {Math.round(selectedFood.protein)} / F: {Math.round(selectedFood.fat)} / C: {Math.round(selectedFood.carbs)}
-            </Text>
-            <AppButton title="CLOSE" onPress={() => setSelectedFood(null)} variant="secondary" />
-          </View>
-        </View>
-      )}
     </SafeAreaView>
   );
 };

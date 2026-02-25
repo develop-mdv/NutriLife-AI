@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -16,11 +16,15 @@ import { AppButton } from '../../components/AppButton';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/RootNavigator';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
+import { AppTheme } from '../../constants/Theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
 export const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const { login } = useAuth();
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -54,6 +58,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
             <TextInput
               style={styles.input}
               placeholder="Email"
+              placeholderTextColor={theme.colors.textMuted}
               keyboardType="email-address"
               autoCapitalize="none"
               value={email}
@@ -62,6 +67,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
             <TextInput
               style={styles.input}
               placeholder="Пароль"
+              placeholderTextColor={theme.colors.textMuted}
               secureTextEntry
               value={password}
               onChangeText={setPassword}
@@ -84,10 +90,10 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.colors.background,
   },
   container: {
     flex: 1,
@@ -102,16 +108,20 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 24,
+    color: theme.colors.textPrimary,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+    color: theme.colors.textPrimary,
     borderRadius: 12,
     padding: 12,
     marginBottom: 12,
   },
   error: {
-    color: 'red',
+    color: '#ef4444',
     marginBottom: 12,
+    textAlign: 'center',
   },
 });

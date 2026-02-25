@@ -389,9 +389,11 @@ export const SleepScreen: React.FC<SleepScreenProps> = ({ navigation }) => {
                     activeOpacity={0.8}
                     onPress={() => onEditEntry(e)}
                   >
-                    <View>
-                      <Text style={styles.historyItemDuration}>{e.durationHours} часов</Text>
-                      <Text style={styles.historyItemDate}>
+                    <View style={{ flex: 1, marginRight: 8 }}>
+                      <Text style={[styles.historyItemDuration, { flexShrink: 1 }]} numberOfLines={1} ellipsizeMode="tail">
+                        {e.durationHours} часов
+                      </Text>
+                      <Text style={styles.historyItemDate} numberOfLines={1}>
                         {new Date(e.date).toLocaleDateString('ru-RU', {
                           day: 'numeric',
                           month: 'short',
@@ -547,8 +549,14 @@ export const SleepScreen: React.FC<SleepScreenProps> = ({ navigation }) => {
                 <Text style={styles.timeHint}>время подъёма</Text>
               </View>
               <Text style={styles.settingsFootnote}>
-                * Будильник придёт как уведомление приложения, когда реализуем напоминания.
+                * Экспериментальный нативный будильник. Обратите внимание, что настройки ниже станут неактуальны.
               </Text>
+              <View style={{ marginTop: 16 }}>
+                <AppButton
+                  title="УПРАВЛЕНИЕ БУДИЛЬНИКАМИ"
+                  onPress={() => navigation.navigate('AlarmList' as any)}
+                />
+              </View>
             </View>
 
             {/* Напоминание о сне */}

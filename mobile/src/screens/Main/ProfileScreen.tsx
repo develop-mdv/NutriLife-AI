@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useTheme } from '../../context/ThemeContext';
@@ -25,6 +26,12 @@ import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/nativ
 import Svg, { Rect, Text as SvgText } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppButton } from '../../components/AppButton';
+import { ProfileStatsTab, AchievementMobile } from '../../features/profile/components/ProfileStatsTab';
+import { ProfilePlanTab } from '../../features/profile/components/ProfilePlanTab';
+import { ProfileSettingsTab } from '../../features/profile/components/ProfileSettingsTab';
+import { GoalPickerModal } from '../../features/profile/components/GoalPickerModal';
+import { AvatarPickerModal } from '../../features/profile/components/AvatarPickerModal';
+import { AchievementModal } from '../../features/profile/components/AchievementModal';
 import { useAuth } from '../../context/AuthContext';
 import { useTodayStats } from '../../hooks/useTodayStats';
 import { useHistoryStats } from '../../hooks/useHistoryStats';
@@ -48,20 +55,10 @@ import {
 } from '../../hooks/useNotifications';
 
 type ActiveTab = 'stats' | 'settings' | 'plan';
-
-interface AchievementMobile {
-  id: string;
-  title: string;
-  description: string;
-  icon: string;
-  unlocked: boolean;
-  current: number;
-  max: number;
-  unit: string;
-}
 type HistoryPeriod = 'week' | 'month';
-
 import { ProgressBar } from '../../components/ProgressBar';
+import { DailyMetricsCard } from '../../components/DailyMetricsCard';
+import { DailyMetricsList, DailyMetricData } from '../../components/DailyMetricsList';
 
 const translateGoal = (goal: string | undefined) => {
   switch (goal) {
@@ -181,20 +178,27 @@ export const ProfileScreen: React.FC = () => {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.5,
-        base64: true,
+        quality: 0.8,
       });
 
-      if (!result.canceled && result.assets && result.assets[0].base64) {
-        const base64Img = `data:image/jpeg;base64,${result.assets[0].base64}`;
+      if (!result.canceled && result.assets && result.assets[0].uri) {
+        const manipResult = await ImageManipulator.manipulateAsync(
+          result.assets[0].uri,
+          [{ resize: { width: 512, height: 512 } }],
+          { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+        );
 
-        // Optimistically update UI
-        if (profile) {
-          setProfile({ ...profile, avatarUri: base64Img });
+        if (manipResult.base64) {
+          const base64Img = `data:image/jpeg;base64,${manipResult.base64}`;
+
+          // Optimistically update UI
+          if (profile) {
+            setProfile({ ...profile, avatarUri: base64Img });
+          }
+
+          // Save to backend immediately
+          await updateProfile({ avatarUri: base64Img });
         }
-
-        // Save to backend immediately
-        await updateProfile({ avatarUri: base64Img });
       }
     } catch (e) {
       console.log('Error picking image', e);
@@ -566,720 +570,60 @@ export const ProfileScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        {activeTab === 'stats' ? (
-          <>
-            {/* Сегодня: цели и прогресс */}
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Цели на сегодня</Text>
-              <View style={styles.statRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.statLabel}>Калории</Text>
-                  <Text style={styles.statValue}>
-                    {todayStats.calories} / {profile.dailyCalorieGoal} ккал
-                  </Text>
-                  <ProgressBar
-                    current={todayStats.calories}
-                    max={profile.dailyCalorieGoal || 2000}
-                    color={theme.colors.accentNutrition}
-                  />
-                </View>
-              </View>
-              <View style={styles.statRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.statLabel}>Шаги</Text>
-                  <Text style={styles.statValue}>
-                    {todayStats.steps} / {profile.dailyStepGoal} шагов
-                  </Text>
-                  <ProgressBar
-                    current={todayStats.steps}
-                    max={profile.dailyStepGoal || 10000}
-                    color={theme.colors.accentActivity}
-                  />
-                </View>
-              </View>
-              <View style={styles.statRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.statLabel}>Вода</Text>
-                  <Text style={styles.statValue}>
-                    {todayStats.water} / {waterGoal} мл
-                  </Text>
-                  <ProgressBar
-                    current={todayStats.water}
-                    max={waterGoal || 2000}
-                    color={theme.colors.accentSystem}
-                  />
-                </View>
-              </View>
-            </View>
+        {activeTab === 'stats' && (
+          <ProfileStatsTab
+            theme={theme}
+            profile={profile}
+            todayStats={todayStats}
+            waterGoal={waterGoal}
+            historyPeriod={historyPeriod}
+            setHistoryPeriod={setHistoryPeriod}
+            historyLoading={historyLoading}
+            historyAverages={historyAverages}
+            filteredHistory={filteredHistory}
+            selectedCalorieIndex={selectedCalorieIndex}
+            setSelectedCalorieIndex={setSelectedCalorieIndex}
+            selectedStepsIndex={selectedStepsIndex}
+            setSelectedStepsIndex={setSelectedStepsIndex}
+            achievements={achievements}
+            setSelectedAchievement={setSelectedAchievement}
+            formatShortDate={formatShortDate}
+            styles={styles}
+          />
+        )}
 
-            {/* История: средние и период */}
-            <View style={styles.card}>
-              <View style={styles.historyHeaderRow}>
-                <Text style={styles.cardTitle}>История</Text>
-                <View style={styles.historyPeriodRow}>
-                  <TouchableOpacity
-                    style={[
-                      styles.historyPeriodChip,
-                      historyPeriod === 'week' && styles.historyPeriodChipActive,
-                    ]}
-                    onPress={() => setHistoryPeriod('week')}
-                  >
-                    <Text
-                      style={[
-                        styles.historyPeriodText,
-                        historyPeriod === 'week' && styles.historyPeriodTextActive,
-                      ]}
-                    >
-                      Неделя
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.historyPeriodChip,
-                      historyPeriod === 'month' && styles.historyPeriodChipActive,
-                    ]}
-                    onPress={() => setHistoryPeriod('month')}
-                  >
-                    <Text
-                      style={[
-                        styles.historyPeriodText,
-                        historyPeriod === 'month' && styles.historyPeriodTextActive,
-                      ]}
-                    >
-                      Месяц
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
+        {activeTab === 'plan' && (
+          <ProfilePlanTab
+            profile={profile}
+            generatingPlan={generatingPlan}
+            loadingRoadmap={loadingRoadmap}
+            roadmap={roadmap}
+            translateGoal={translateGoal}
+            setIsAdjustingPlan={setIsAdjustingPlan}
+            onGeneratePlan={onGeneratePlan}
+            styles={styles}
+          />
+        )}
 
-              {historyLoading ? (
-                <ActivityIndicator />
-              ) : (
-                <>
-                  <View style={styles.historyGrid}>
-                    <View style={[styles.historyCard, { backgroundColor: '#ecfdf5' }]}>
-                      <Text style={styles.historyLabel}>Ср. калории</Text>
-                      <Text style={styles.historyValue}>{historyAverages.calories}</Text>
-                      <Text style={styles.historyUnit}>ккал / день</Text>
-                    </View>
-                    <View style={[styles.historyCard, { backgroundColor: '#fef2f2' }]}>
-                      <Text style={styles.historyLabel}>Ср. шаги</Text>
-                      <Text style={styles.historyValue}>{historyAverages.steps}</Text>
-                      <Text style={styles.historyUnit}>шагов / день</Text>
-                    </View>
-                    <View style={[styles.historyCard, { backgroundColor: '#e0f2fe' }]}>
-                      <Text style={styles.historyLabel}>Ср. вода</Text>
-                      <Text style={styles.historyValue}>{historyAverages.water}</Text>
-                      <Text style={styles.historyUnit}>мл / день</Text>
-                    </View>
-                    <View style={[styles.historyCard, { backgroundColor: '#eef2ff' }]}>
-                      <Text style={styles.historyLabel}>Ср. сон</Text>
-                      <Text style={styles.historyValue}>{historyAverages.sleep}</Text>
-                      <Text style={styles.historyUnit}>ч / ночь</Text>
-                    </View>
-                  </View>
-
-                  {filteredHistory.length > 0 && (
-                    <View style={styles.historyChartsWrapper}>
-                      {/* Калории по дням */}
-                      <View style={styles.historyChartBox}>
-                        <View style={styles.historyChartHeader}>
-                          <Text style={styles.historyChartTitle}>Калории по дням</Text>
-                          {selectedCalorieIndex != null &&
-                            filteredHistory[selectedCalorieIndex] && (
-                              <View style={styles.historyChartTooltipBadge}>
-                                <Text style={styles.historyChartTooltipDate}>
-                                  {formatShortDate(filteredHistory[selectedCalorieIndex].date)}
-                                </Text>
-                                <Text style={styles.historyChartTooltipValue}>
-                                  {filteredHistory[selectedCalorieIndex].calories} ккал
-                                </Text>
-                              </View>
-                            )}
-                        </View>
-                        {(() => {
-                          const barWidth = 28;
-                          const barGap = 8;
-                          const maxHeight = 80;
-                          const labelHeight = 20;
-                          const maxValue = Math.max(
-                            ...filteredHistory.map((d) => d.calories || 0),
-                            1,
-                          );
-                          const chartWidth =
-                            filteredHistory.length * (barWidth + barGap) + barGap;
-                          return (
-                            <ScrollView
-                              horizontal
-                              showsHorizontalScrollIndicator={false}
-                              style={styles.historyChartScroll}
-                              contentContainerStyle={{ paddingHorizontal: 4 }}
-                            >
-                              <View style={styles.historyChartContainer}>
-                                <Svg width={chartWidth} height={maxHeight + labelHeight}>
-                                  {filteredHistory.map((d, index) => {
-                                    const value = d.calories || 0;
-                                    const barHeight = Math.max((value / maxValue) * maxHeight, 4);
-                                    const x = index * (barWidth + barGap) + barGap;
-                                    const y = maxHeight - barHeight;
-                                    const isSelected = index === selectedCalorieIndex;
-                                    const dateStr = d.date ? new Date(d.date).getDate().toString() : '';
-                                    return (
-                                      <React.Fragment key={d.date || index}>
-                                        <Rect
-                                          x={x}
-                                          y={isSelected ? y - 4 : y}
-                                          width={barWidth}
-                                          height={isSelected ? barHeight + 4 : barHeight}
-                                          rx={6}
-                                          fill={isSelected ? '#15803d' : '#34d399'}
-                                          onPress={() => setSelectedCalorieIndex(index)}
-                                        />
-                                        <SvgText
-                                          x={x + barWidth / 2}
-                                          y={maxHeight + 14}
-                                          fontSize={10}
-                                          fill={isSelected ? '#111827' : '#9ca3af'}
-                                          fontWeight={isSelected ? 'bold' : 'normal'}
-                                          textAnchor="middle"
-                                        >
-                                          {dateStr}
-                                        </SvgText>
-                                      </React.Fragment>
-                                    );
-                                  })}
-                                </Svg>
-                              </View>
-                            </ScrollView>
-                          );
-                        })()}
-                      </View>
-
-                      {/* Шаги по дням */}
-                      <View style={styles.historyChartBox}>
-                        <View style={styles.historyChartHeader}>
-                          <Text style={styles.historyChartTitle}>Шаги по дням</Text>
-                          {selectedStepsIndex != null &&
-                            filteredHistory[selectedStepsIndex] && (
-                              <View style={[styles.historyChartTooltipBadge, { backgroundColor: '#fef2f2' }]}>
-                                <Text style={styles.historyChartTooltipDate}>
-                                  {formatShortDate(filteredHistory[selectedStepsIndex].date)}
-                                </Text>
-                                <Text style={[styles.historyChartTooltipValue, { color: '#dc2626' }]}>
-                                  {filteredHistory[selectedStepsIndex].steps} шагов
-                                </Text>
-                              </View>
-                            )}
-                        </View>
-                        {(() => {
-                          const barWidth = 28;
-                          const barGap = 8;
-                          const maxHeight = 80;
-                          const labelHeight = 20;
-                          const maxValue = Math.max(
-                            ...filteredHistory.map((d) => d.steps || 0),
-                            1,
-                          );
-                          const chartWidth =
-                            filteredHistory.length * (barWidth + barGap) + barGap;
-                          return (
-                            <ScrollView
-                              horizontal
-                              showsHorizontalScrollIndicator={false}
-                              style={styles.historyChartScroll}
-                              contentContainerStyle={{ paddingHorizontal: 4 }}
-                            >
-                              <View style={styles.historyChartContainer}>
-                                <Svg width={chartWidth} height={maxHeight + labelHeight}>
-                                  {filteredHistory.map((d, index) => {
-                                    const value = d.steps || 0;
-                                    const barHeight = Math.max((value / maxValue) * maxHeight, 4);
-                                    const x = index * (barWidth + barGap) + barGap;
-                                    const y = maxHeight - barHeight;
-                                    const isSelected = index === selectedStepsIndex;
-                                    const dateStr = d.date ? new Date(d.date).getDate().toString() : '';
-                                    return (
-                                      <React.Fragment key={d.date || index}>
-                                        <Rect
-                                          x={x}
-                                          y={isSelected ? y - 4 : y}
-                                          width={barWidth}
-                                          height={isSelected ? barHeight + 4 : barHeight}
-                                          rx={6}
-                                          fill={isSelected ? '#b91c1c' : '#ef4444'}
-                                          onPress={() => setSelectedStepsIndex(index)}
-                                        />
-                                        <SvgText
-                                          x={x + barWidth / 2}
-                                          y={maxHeight + 14}
-                                          fontSize={10}
-                                          fill={isSelected ? '#111827' : '#9ca3af'}
-                                          fontWeight={isSelected ? 'bold' : 'normal'}
-                                          textAnchor="middle"
-                                        >
-                                          {dateStr}
-                                        </SvgText>
-                                      </React.Fragment>
-                                    );
-                                  })}
-                                </Svg>
-                              </View>
-                            </ScrollView>
-                          );
-                        })()}
-                      </View>
-                    </View>
-                  )}
-                </>
-              )}
-            </View>
-
-            {/* Достижения */}
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Достижения</Text>
-              <View style={styles.achievementsGrid}>
-                {achievements.map((a) => (
-                  <TouchableOpacity
-                    key={a.id}
-                    style={[
-                      styles.achievementCard,
-                      a.unlocked ? styles.achievementCardUnlocked : styles.achievementCardLocked,
-                    ]}
-                    activeOpacity={0.85}
-                    onPress={() => setSelectedAchievement(a)}
-                  >
-                    <Text style={styles.achievementIcon}>{a.icon}</Text>
-                    <Text style={styles.achievementTitle}>{a.title}</Text>
-                    {!a.unlocked && a.max > 1 && (
-                      <View style={styles.achievementProgressBarOuter}>
-                        <View
-                          style={[
-                            styles.achievementProgressBarInner,
-                            { width: `${(a.current / a.max) * 100}%` },
-                          ]}
-                        />
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          </>
-        ) : activeTab === 'plan' ? (
-          <>
-            {/* Мой план (roadmap) */}
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Мой план</Text>
-              {generatingPlan ? (
-                <View style={styles.planPendingBox}>
-                  <ActivityIndicator style={{ marginBottom: 8 }} />
-                  <Text style={styles.planPendingTitle}>ИИ корректирует ваш план</Text>
-                  <Text style={styles.planPendingText}>
-                    Мы подстраиваем рекомендации под новую цель. Это может занять несколько секунд.
-                  </Text>
-                </View>
-              ) : loadingRoadmap && !roadmap ? (
-                <View style={styles.center}>
-                  <ActivityIndicator />
-                </View>
-              ) : roadmap && roadmap.steps && roadmap.steps.length > 0 ? (
-                <>
-                  <View style={styles.planHeaderBox}>
-                    <Text style={styles.planGoalLabel}>Текущая цель</Text>
-                    <Text style={styles.planGoalValue}>{translateGoal(profile.goal)}</Text>
-                    <Text style={styles.planTargetsText}>
-                      Калории: {Math.round(roadmap.targets.dailyCalories)} · Вода: {Math.round(roadmap.targets.dailyWater)} мл · Шаги: {Math.round(roadmap.targets.dailySteps)} · Сон: {roadmap.targets.sleepHours} ч
-                    </Text>
-                  </View>
-                  <View style={styles.planStepsWrapper}>
-                    {roadmap.steps.map((step, index) => (
-                      <View key={`${step.title}-${index}`} style={styles.planStepRow}>
-                        <View style={styles.planStepCircle}>
-                          <Text style={styles.planStepCircleText}>{index + 1}</Text>
-                        </View>
-                        <View style={styles.planStepCard}>
-                          <Text style={styles.planStepTitle}>{step.title}</Text>
-                          <Text style={styles.planStepDescription}>{step.description}</Text>
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                  <View style={styles.planFooterRow}>
-                    <Text style={styles.planFooterText}>План можно в любой момент уточнить через ИИ.</Text>
-                    <AppButton title="Изменить план" onPress={() => setIsAdjustingPlan(true)} />
-                  </View>
-                </>
-              ) : (
-                <View style={styles.planEmptyBox}>
-                  <Text style={styles.planEmptyTitle}>Ваш путь к здоровью</Text>
-                  <Text style={styles.planEmptyText}>
-                    ИИ проанализирует ваши параметры и составит персональный план действий.
-                  </Text>
-                  <AppButton
-                    title={generatingPlan ? 'Создаю план...' : 'Создать план'}
-                    onPress={() => onGeneratePlan(false)}
-                    disabled={generatingPlan}
-                  />
-                </View>
-              )}
-            </View>
-          </>
-        ) : (
-          <>
-            {/* Настройки: базовые данные */}
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Мои данные</Text>
-              <View style={styles.formRow}>
-                <View style={styles.formField}>
-                  <Text style={styles.formLabel}>Имя</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={profile.name}
-                    onChangeText={(text) => {
-                      setProfile({ ...profile, name: text });
-                      setHasUnsavedChanges(true);
-                    }}
-                  />
-                </View>
-              </View>
-              <View style={styles.formRow}>
-                <View style={styles.formField}>
-                  <Text style={styles.formLabel}>Рост (см)</Text>
-                  <TextInput
-                    style={styles.input}
-                    keyboardType="numeric"
-                    value={String(profile.height || '')}
-                    onChangeText={(text) => {
-                      setProfile({ ...profile, height: Number(text) || 0 });
-                      setHasUnsavedChanges(true);
-                    }}
-                  />
-                </View>
-                <View style={styles.formField}>
-                  <Text style={styles.formLabel}>Вес (кг)</Text>
-                  <TextInput
-                    style={styles.input}
-                    keyboardType="numeric"
-                    value={String(profile.weight || '')}
-                    onChangeText={(text) => {
-                      setProfile({ ...profile, weight: Number(text) || 0 });
-                      setHasUnsavedChanges(true);
-                    }}
-                  />
-                </View>
-              </View>
-              <View style={styles.formRow}>
-                <View style={styles.formField}>
-                  <Text style={styles.formLabel}>Возраст</Text>
-                  <TextInput
-                    style={styles.input}
-                    keyboardType="numeric"
-                    value={String(profile.age || '')}
-                    onChangeText={(text) => {
-                      setProfile({ ...profile, age: Number(text) || 0 });
-                      setHasUnsavedChanges(true);
-                    }}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.genderSectionRow}>
-                <Text style={styles.formLabel}>Пол</Text>
-                <View style={styles.genderCardsRow}>
-                  <TouchableOpacity
-                    activeOpacity={0.9}
-                    style={[
-                      styles.genderCard,
-                      (profile.gender === 'male' || !profile.gender) && styles.genderCardSelected,
-                    ]}
-                    onPress={() => {
-                      setProfile({ ...profile, gender: 'male' });
-                      setHasUnsavedChanges(true);
-                    }}
-                  >
-                    <View style={styles.genderImageStub}>
-                      <Image
-                        source={require('../../../assets/images/male.png')}
-                        style={styles.genderImage}
-                        resizeMode="contain"
-                      />
-                    </View>
-                    <View style={styles.genderCardFooter}>
-                      <Text style={styles.genderLabel}>Мужской</Text>
-                      {(profile.gender === 'male' || !profile.gender) && (
-                        <View style={styles.genderCheckBadge}>
-                          <Text style={styles.genderCheckText}>✓</Text>
-                        </View>
-                      )}
-                    </View>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    activeOpacity={0.9}
-                    style={[
-                      styles.genderCard,
-                      profile.gender === 'female' && styles.genderCardSelected,
-                    ]}
-                    onPress={() => {
-                      setProfile({ ...profile, gender: 'female' });
-                      setHasUnsavedChanges(true);
-                    }}
-                  >
-                    <View style={styles.genderImageStub}>
-                      <Image
-                        source={require('../../../assets/images/female.png')}
-                        style={styles.genderImage}
-                        resizeMode="contain"
-                      />
-                    </View>
-                    <View style={styles.genderCardFooter}>
-                      <Text style={styles.genderLabel}>Женский</Text>
-                      {profile.gender === 'female' && (
-                        <View style={styles.genderCheckBadge}>
-                          <Text style={styles.genderCheckText}>✓</Text>
-                        </View>
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-
-            {/* Цели */}
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Цели</Text>
-              <View style={styles.formRow}>
-                <View style={styles.formField}>
-                  <Text style={styles.formLabel}>Калории в день</Text>
-                  <TextInput
-                    style={styles.input}
-                    keyboardType="numeric"
-                    value={String(profile.dailyCalorieGoal || '')}
-                    onChangeText={(text) => {
-                      setProfile({
-                        ...profile,
-                        dailyCalorieGoal: Number(text) || 0,
-                      });
-                      setHasUnsavedChanges(true);
-                    }}
-                  />
-                </View>
-              </View>
-              <View style={styles.formRow}>
-                <View style={styles.formField}>
-                  <Text style={styles.formLabel}>Шаги в день</Text>
-                  <TextInput
-                    style={styles.input}
-                    keyboardType="numeric"
-                    value={String(profile.dailyStepGoal || '')}
-                    onChangeText={(text) => {
-                      setProfile({
-                        ...profile,
-                        dailyStepGoal: Number(text) || 0,
-                      });
-                      setHasUnsavedChanges(true);
-                    }}
-                  />
-                </View>
-                <View style={styles.formField}>
-                  <Text style={styles.formLabel}>Вода (мл/день)</Text>
-                  <TextInput
-                    style={styles.input}
-                    keyboardType="numeric"
-                    value={String(settings.waterGoal || '')}
-                    onChangeText={(text) => {
-                      setSettings({
-                        ...settings,
-                        waterGoal: Number(text) || 0,
-                      });
-                      setHasUnsavedChanges(true);
-                    }}
-                  />
-                </View>
-              </View>
-            </View>
-
-            {/* Персонализация */}
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Персонализация</Text>
-              <View style={styles.formFieldFull}>
-                <Text style={styles.formLabel}>Аллергии</Text>
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  multiline
-                  value={profile.allergies || ''}
-                  onChangeText={(text) => {
-                    setProfile({ ...profile, allergies: text });
-                    setHasUnsavedChanges(true);
-                  }}
-                  placeholder="Орехи, мед..."
-                />
-              </View>
-              <View style={styles.formFieldFull}>
-                <Text style={styles.formLabel}>Предпочтения</Text>
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  multiline
-                  value={profile.preferences || ''}
-                  onChangeText={(text) => {
-                    setProfile({ ...profile, preferences: text });
-                    setHasUnsavedChanges(true);
-                  }}
-                  placeholder="Вегетарианец, люблю острое..."
-                />
-              </View>
-              <View style={styles.formFieldFull}>
-                <Text style={styles.formLabel}>Здоровье</Text>
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  multiline
-                  value={profile.healthConditions || ''}
-                  onChangeText={(text) => {
-                    setProfile({ ...profile, healthConditions: text });
-                    setHasUnsavedChanges(true);
-                  }}
-                  placeholder="Диабет, травма колена..."
-                />
-              </View>
-            </View>
-
-            {/* Внешний вид */}
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Внешний вид</Text>
-              <View style={styles.switchRow}>
-                {/* Dynamic label and icon: Sun for Light, Moon for Dark */}
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Text style={{ fontSize: 20, marginRight: 8 }}>
-                    {mode === 'dark' ? '🌙' : '☀️'}
-                  </Text>
-                  <Text style={styles.formLabel}>
-                    {mode === 'dark' ? 'Темная тема' : 'Светлая тема'}
-                  </Text>
-                </View>
-                <Switch
-                  value={mode === 'dark'}
-                  onValueChange={toggleTheme}
-                  trackColor={{ false: theme.colors.surfaceAlt, true: theme.colors.accentNutrition }}
-                  thumbColor={Platform.OS === 'ios' ? undefined : '#fff'}
-                />
-              </View>
-            </View>
-
-            {/* Сон и напоминания */}
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Сон и напоминания</Text>
-              <View style={styles.formRow}>
-                <View style={styles.formField}>
-                  <Text style={styles.formLabel}>Цель сна (ч)</Text>
-                  <TextInput
-                    style={styles.input}
-                    keyboardType="numeric"
-                    value={String(settings.sleep.targetHours || '')}
-                    onChangeText={(text) => {
-                      setSettings({
-                        ...settings,
-                        sleep: {
-                          ...settings.sleep,
-                          targetHours: Number(text) || 0,
-                        },
-                      });
-                      setHasUnsavedChanges(true);
-                    }}
-                  />
-                </View>
-              </View>
-              <View style={styles.formRow}>
-                <View style={styles.formField}>
-                  <Text style={styles.formLabel}>Отбой (ч:мм)</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={settings.sleep.bedTime}
-                    onChangeText={async (text) => {
-                      setSettings({
-                        ...settings,
-                        sleep: { ...settings.sleep, bedTime: text },
-                      });
-                      setHasUnsavedChanges(true);
-                      if (settings.sleep.bedTimeReminderEnabled) {
-                        await scheduleOrCancelSleep('sleep_bed', true, text);
-                      }
-                    }}
-                  />
-                </View>
-                <View style={styles.formField}>
-                  <Text style={styles.formLabel}>Подъём (ч:мм)</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={settings.sleep.wakeTime}
-                    onChangeText={async (text) => {
-                      setSettings({
-                        ...settings,
-                        sleep: { ...settings.sleep, wakeTime: text },
-                      });
-                      setHasUnsavedChanges(true);
-                      if (settings.sleep.wakeAlarmEnabled) {
-                        await scheduleOrCancelSleep('sleep_wake', true, text);
-                      }
-                    }}
-                  />
-                </View>
-              </View>
-              {/* Напоминания о сне и воде */}
-              <View style={styles.switchRow}>
-                <Text style={styles.formLabel}>Напоминать перед сном</Text>
-                <Switch
-                  value={settings.sleep.bedTimeReminderEnabled}
-                  onValueChange={async (value) => {
-                    setSettings({
-                      ...settings,
-                      sleep: { ...settings.sleep, bedTimeReminderEnabled: value },
-                    });
-                    await scheduleOrCancelSleep('sleep_bed', value, settings.sleep.bedTime);
-                  }}
-                />
-              </View>
-              <View style={styles.switchRow}>
-                <Text style={styles.formLabel}>Будильник по утрам</Text>
-                <Switch
-                  value={settings.sleep.wakeAlarmEnabled}
-                  onValueChange={async (value) => {
-                    setSettings({
-                      ...settings,
-                      sleep: { ...settings.sleep, wakeAlarmEnabled: value },
-                    });
-                    await scheduleOrCancelSleep('sleep_wake', value, settings.sleep.wakeTime);
-                  }}
-                />
-              </View>
-              <View style={styles.switchRow}>
-                <Text style={styles.formLabel}>Оповещения о воде</Text>
-                <Switch
-                  value={waterRemindersEnabled}
-                  onValueChange={async (value) => {
-                    try {
-                      if (value) {
-                        await scheduleWaterReminder(120);
-                      } else {
-                        await cancelWaterReminders();
-                      }
-                      setWaterRemindersEnabled(value);
-                      await AsyncStorage.setItem('waterRemindersEnabled', value ? 'true' : 'false');
-                    } catch (e) {
-                      console.log('Ошибка переключения напоминаний о воде (профиль)', e);
-                    }
-                  }}
-                />
-              </View>
-            </View>
-
-            <View style={{ marginTop: 8 }}>
-              <AppButton
-                title={saving ? 'Сохранение...' : 'Сохранить профиль'}
-                onPress={onSaveSettings}
-                disabled={saving}
-              />
-            </View>
-          </>
+        {activeTab === 'settings' && (
+          <ProfileSettingsTab
+            profile={profile}
+            setProfile={setProfile}
+            settings={settings}
+            setSettings={setSettings}
+            setHasUnsavedChanges={setHasUnsavedChanges}
+            mode={mode}
+            theme={theme}
+            toggleTheme={toggleTheme}
+            waterRemindersEnabled={waterRemindersEnabled}
+            setWaterRemindersEnabled={setWaterRemindersEnabled}
+            scheduleOrCancelSleep={scheduleOrCancelSleep}
+            scheduleWaterReminder={scheduleWaterReminder}
+            cancelWaterReminders={cancelWaterReminders}
+            saving={saving}
+            onSaveSettings={onSaveSettings}
+            styles={styles}
+          />
         )}
 
         <View style={{ marginTop: 16 }}>
@@ -1319,265 +663,115 @@ export const ProfileScreen: React.FC = () => {
             </View>
           </View>
         </View>
-      )}
+      )
+      }
 
-      {showUnsavedModal && (
-        <View style={styles.planOverlay}>
-          <TouchableOpacity
-            style={StyleSheet.absoluteFillObject}
-            activeOpacity={1}
-            onPress={() => {
-              setShowUnsavedModal(false);
-              setPendingTab(null);
-              setPendingLogout(false);
-              setPendingNavAction(null);
-            }}
-          />
-          <View style={styles.goalOverlayCard}>
-            <Text style={styles.goalOverlayTitle}>Сохранить изменения?</Text>
-            <Text style={styles.goalOverlaySubtitle}>
-              Вы изменили настройки профиля. Сохранить их перед выходом?
-            </Text>
-            <View style={styles.planOverlayButtonsRow}>
-              <AppButton
-                title="Не сохранять"
-                onPress={async () => {
-                  setShowUnsavedModal(false);
-                  setHasUnsavedChanges(false);
-                  await reloadProfileAndRoadmap();
-                  if (pendingTab) {
-                    setActiveTab(pendingTab);
-                  } else if (pendingNavAction) {
-                    navigation.dispatch(pendingNavAction);
-                  } else if (pendingLogout) {
-                    logout();
-                  }
-                  setPendingTab(null);
-                  setPendingLogout(false);
-                  setPendingNavAction(null);
-                }}
-              />
-              <AppButton
-                title="Сохранить"
-                onPress={async () => {
-                  setShowUnsavedModal(false);
-                  await onSaveSettings();
-                  if (pendingTab) {
-                    setActiveTab(pendingTab);
-                  } else if (pendingNavAction) {
-                    navigation.dispatch(pendingNavAction);
-                  } else if (pendingLogout) {
-                    logout();
-                  }
-                  setPendingTab(null);
-                  setPendingLogout(false);
-                  setPendingNavAction(null);
-                }}
-              />
-            </View>
-          </View>
-        </View>
-      )}
-
-      {showGoalPicker && (
-        <View style={styles.planOverlay}>
-          <TouchableOpacity
-            style={StyleSheet.absoluteFillObject}
-            activeOpacity={1}
-            onPress={() => setShowGoalPicker(false)}
-          />
-          <View style={styles.goalOverlayCard}>
-            <Text style={styles.goalOverlayTitle}>Выбор цели и аватара</Text>
-            <Text style={styles.goalOverlaySubtitle}>Это поможет скорректировать рекомендации и план.</Text>
-            {/* Блок выбора цели */}
-            {[
-              { id: 'lose_weight', label: 'Похудение', description: 'Снижение веса с акцентом на дефицит калорий и активность.' },
-              { id: 'gain_muscle', label: 'Набор массы', description: 'Умеренный профицит калорий и повышенный белок для роста мышц.' },
-              { id: 'maintain', label: 'Поддержание', description: 'Стабильный вес и поддержание текущей формы.' },
-            ].map((option) => (
-              <TouchableOpacity
-                key={option.id}
-                style={[
-                  styles.goalOptionRow,
-                  profile.goal === option.id && styles.goalOptionRowActive,
-                ]}
-                activeOpacity={0.8}
-                onPress={async () => {
-                  if (!profile) return;
-                  const newGoal = option.id as UserProfileApi['goal'];
-                  const updatedProfile: UserProfileApi = {
-                    ...profile,
-                    goal: newGoal,
-                  };
-                  setProfile(updatedProfile);
-                  setShowGoalPicker(false);
-                  try {
-                    await updateProfile(updatedProfile);
-                    // При смене цели сразу генерируем новый план через ИИ
-                    await onGeneratePlan(false);
-                  } catch (e) {
-                    console.log('Ошибка обновления цели профиля / генерации плана', e);
-                  }
-                }}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.goalOptionLabel}>{option.label}</Text>
-                  <Text style={styles.goalOptionDescription}>{option.description}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-            {/* Блок выбора аватара-emoji удален отсюда и перенесен в отдельное окно */}
-            <View style={{ marginTop: 12 }}>
-              <AppButton title="Закрыть" onPress={() => setShowGoalPicker(false)} />
-            </View>
-          </View>
-        </View>
-      )}
-
-      {showAvatarModal && (
-        <View style={styles.planOverlay}>
-          <TouchableOpacity
-            style={StyleSheet.absoluteFillObject}
-            activeOpacity={1}
-            onPress={() => setShowAvatarModal(false)}
-          />
-          <View style={styles.goalOverlayCard}>
-            <Text style={styles.goalOverlayTitle}>Сменить аватар</Text>
-            <Text style={styles.goalOverlaySubtitle}>Выберите фото или эмодзи</Text>
-
-            <View style={{ gap: 12, marginTop: 8 }}>
-              {/* Photo Options */}
-              <AppButton
-                title="Загрузить фото"
-                onPress={() => {
-                  pickImage();
-                  setShowAvatarModal(false);
-                }}
-              />
-
-              {profile?.avatarUri && (
-                <TouchableOpacity
-                  style={{
-                    paddingVertical: 12,
-                    alignItems: 'center',
-                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                    borderRadius: 16,
+      {
+        showUnsavedModal && (
+          <View style={styles.planOverlay}>
+            <TouchableOpacity
+              style={StyleSheet.absoluteFillObject}
+              activeOpacity={1}
+              onPress={() => {
+                setShowUnsavedModal(false);
+                setPendingTab(null);
+                setPendingLogout(false);
+                setPendingNavAction(null);
+              }}
+            />
+            <View style={styles.goalOverlayCard}>
+              <Text style={styles.goalOverlayTitle}>Сохранить изменения?</Text>
+              <Text style={styles.goalOverlaySubtitle}>
+                Вы изменили настройки профиля. Сохранить их перед выходом?
+              </Text>
+              <View style={styles.planOverlayButtonsRow}>
+                <AppButton
+                  title="Не сохранять"
+                  onPress={async () => {
+                    setShowUnsavedModal(false);
+                    setHasUnsavedChanges(false);
+                    await reloadProfileAndRoadmap();
+                    if (pendingTab) {
+                      setActiveTab(pendingTab);
+                    } else if (pendingNavAction) {
+                      navigation.dispatch(pendingNavAction);
+                    } else if (pendingLogout) {
+                      logout();
+                    }
+                    setPendingTab(null);
+                    setPendingLogout(false);
+                    setPendingNavAction(null);
                   }}
-                  onPress={() => {
-                    removeAvatar();
-                    setShowAvatarModal(false);
+                />
+                <AppButton
+                  title="Сохранить"
+                  onPress={async () => {
+                    setShowUnsavedModal(false);
+                    await onSaveSettings();
+                    if (pendingTab) {
+                      setActiveTab(pendingTab);
+                    } else if (pendingNavAction) {
+                      navigation.dispatch(pendingNavAction);
+                    } else if (pendingLogout) {
+                      logout();
+                    }
+                    setPendingTab(null);
+                    setPendingLogout(false);
+                    setPendingNavAction(null);
                   }}
-                >
-                  <Text style={{ color: '#ef4444', fontWeight: '700', fontSize: 14 }}>
-                    Удалить фото
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-
-            <View style={{ height: 1, backgroundColor: theme.colors.border, marginVertical: 20 }} />
-
-            {/* Emoji Options */}
-            <Text style={[styles.goalOverlaySubtitle, { marginBottom: 12, textAlign: 'center' }]}>
-              или выберите эмодзи
-            </Text>
-
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 }}>
-              {['🧑‍💻', '🏃‍♂️', '🏃‍♀️', '💪', '🥦', '🧘‍♀️', '🚴‍♂️', '🌞', '👽', '🦄', '😺', '🦊'].map((emoji) => (
-                <TouchableOpacity
-                  key={emoji}
-                  style={{
-                    width: 48,
-                    height: 48,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderRadius: 24,
-                    backgroundColor: profile?.avatarEmoji === emoji ? theme.colors.surfaceAlt : 'transparent',
-                    borderWidth: profile?.avatarEmoji === emoji ? 1 : 0,
-                    borderColor: theme.colors.accentNutrition,
-                  }}
-                  onPress={() => {
-                    // Updating emoji clears the photo URI to prioritize emoji if user selects one? 
-                    // Or should we keep both but prioritize one?
-                    // Typically if user picks emoji, they want to see emoji.
-                    // Let's clear URI if emoji is picked, or just set emoji and let URI logic handle precedence (URI > Emoji currently).
-                    // If URI > Emoji, and user picks Emoji, we must clear URI to show Emoji.
-                    const updated = { ...profile, avatarEmoji: emoji, avatarUri: undefined };
-                    setProfile(updated as any);
-
-                    // Direct save or strict save button?
-                    // "onSaveSettings" is manual save. But avatar usually updates instantly.
-                    // Let's do instant update for emoji too like we did for Photo.
-                    updateProfile({ avatarEmoji: emoji, avatarUri: '' } as any).catch(e => console.log(e));
-
-                    setShowAvatarModal(false);
-                  }}
-                >
-                  <Text style={{ fontSize: 24 }}>{emoji}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <View style={{ marginTop: 24 }}>
-              <AppButton title="Отмена" onPress={() => setShowAvatarModal(false)} variant="secondary" />
-            </View>
-          </View>
-        </View>
-      )}
-
-      {selectedAchievement && (
-        <View style={styles.planOverlay}>
-          <TouchableOpacity
-            style={StyleSheet.absoluteFillObject}
-            activeOpacity={1}
-            onPress={() => setSelectedAchievement(null)}
-          />
-          <View style={styles.achievementOverlayCard}>
-            <Text style={styles.achievementOverlayTitle}>{selectedAchievement.title}</Text>
-            <Text style={styles.achievementOverlayIcon}>{selectedAchievement.icon}</Text>
-            <Text style={styles.achievementOverlayDescription}>{selectedAchievement.description}</Text>
-            {selectedAchievement.max > 1 && (
-              <View style={{ marginTop: 12 }}>
-                <Text style={styles.achievementOverlayProgressLabel}>
-                  Прогресс: {selectedAchievement.current} / {selectedAchievement.max}{' '}
-                  {selectedAchievement.unit}
-                </Text>
-                <View style={styles.achievementProgressBarOuter}>
-                  <View
-                    style={[
-                      styles.achievementProgressBarInner,
-                      {
-                        width: `${Math.min(
-                          (selectedAchievement.current / selectedAchievement.max) * 100,
-                          100,
-                        )}%`,
-                      },
-                    ]}
-                  />
-                </View>
+                />
               </View>
-            )}
-            {selectedAchievement.unlocked && (
-              <Text style={styles.achievementOverlayUnlocked}>Достижение уже разблокировано 🎉</Text>
-            )}
-            <View style={{ marginTop: 16 }}>
-              <AppButton title="Закрыть" onPress={() => setSelectedAchievement(null)} />
             </View>
           </View>
-        </View>
-      )}
+        )
+      }
+
+      <GoalPickerModal
+        visible={showGoalPicker}
+        onClose={() => setShowGoalPicker(false)}
+        profile={profile}
+        onSelectGoal={async (goalId) => {
+          if (!profile) return;
+          const updatedProfile: UserProfileApi = {
+            ...profile,
+            goal: goalId as UserProfileApi['goal'],
+          };
+          setProfile(updatedProfile);
+          setShowGoalPicker(false);
+          try {
+            await updateProfile(updatedProfile);
+            await onGeneratePlan(false);
+          } catch (e) {
+            console.log('Ошибка обновления цели профиля / генерации плана', e);
+          }
+        }}
+        styles={styles}
+      />
+
+      <AvatarPickerModal
+        visible={showAvatarModal}
+        onClose={() => setShowAvatarModal(false)}
+        profile={profile}
+        onPickImage={() => { pickImage(); setShowAvatarModal(false); }}
+        onRemoveAvatar={() => { removeAvatar(); setShowAvatarModal(false); }}
+        onSelectEmoji={async (emoji) => {
+          const updated = { ...profile, avatarEmoji: emoji, avatarUri: undefined };
+          setProfile(updated as any);
+          updateProfile({ avatarEmoji: emoji, avatarUri: '' } as any).catch(e => console.log(e));
+          setShowAvatarModal(false);
+        }}
+        theme={theme}
+        styles={styles}
+      />
+
+      <AchievementModal
+        achievement={selectedAchievement}
+        onClose={() => setSelectedAchievement(null)}
+        styles={styles}
+      />
     </SafeAreaView>
   );
 };
-
-// --- Styles for Avatar Modal ---
-// We'll add this to the main stylesheet or keep it inline if simple, but better in createStyles
-// For simplicity in this edit, I will render the Modal JSX before SafeAreaView close, using existing styles + new ones.
-
-/* 
-   Place this new Modal block inside the return, before </SafeAreaView>. 
-   I will use the `multi_replace` to insert it after the `showGoalPicker` block.
-*/
 
 const createStyles = (theme: AppTheme) => StyleSheet.create({
   safeContainer: {
