@@ -1,5 +1,10 @@
 import { GoogleGenAI } from '@google/genai';
 
+export interface WalkCoord {
+  lat: number;
+  lng: number;
+}
+
 export interface WalkingRoute {
   title: string;
   description: string;
@@ -9,6 +14,9 @@ export interface WalkingRoute {
   startLocation: string;
   endLocation: string;
   isRoundTrip?: boolean;
+  startCoords?: WalkCoord;
+  endCoords?: WalkCoord;
+  waypoints?: WalkCoord[];
 }
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
@@ -16,7 +24,6 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 // --- Reverse Geocoding для более точного определения адреса по координатам ---
 export const reverseGeocode = async (lat: number, lng: number): Promise<string | null> => {
   try {
-    // Используем Nominatim (OpenStreetMap) - бесплатный сервис
     const response = await fetch(
       `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=ru&addressdetails=1`,
       {
@@ -25,16 +32,15 @@ export const reverseGeocode = async (lat: number, lng: number): Promise<string |
         },
       }
     );
-    
+
     if (!response.ok) return null;
-    
+
     const data = await response.json();
     if (!data || !data.address) return null;
-    
+
     const addr = data.address;
     const parts: string[] = [];
-    
-    // Собираем адрес из частей
+
     if (addr.city || addr.town || addr.village || addr.state) {
       parts.push(addr.city || addr.town || addr.village || addr.state);
     }
@@ -44,15 +50,41 @@ export const reverseGeocode = async (lat: number, lng: number): Promise<string |
     if (addr.house_number) {
       parts.push(addr.house_number);
     }
-    
+
     if (parts.length === 0) {
-      // Если не удалось собрать, вернём display_name
       return data.display_name || null;
     }
-    
+
     return parts.join(', ');
   } catch (e) {
     console.error('reverseGeocode error', e);
+    return null;
+  }
+};
+
+// --- Forward Geocoding: address -> coordinates ---
+export const forwardGeocode = async (address: string): Promise<WalkCoord | null> => {
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1&accept-language=ru`,
+      {
+        headers: {
+          'User-Agent': 'NutriLife-AI/1.0',
+        },
+      }
+    );
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    if (!data || data.length === 0) return null;
+
+    return {
+      lat: parseFloat(data[0].lat),
+      lng: parseFloat(data[0].lon),
+    };
+  } catch (e) {
+    console.error('forwardGeocode error', e);
     return null;
   }
 };
@@ -90,11 +122,14 @@ export const suggestWalkingRoutes = async (
 
     let locationInstruction = '';
     let resolvedAddress: string | null = null;
+    let startCoords: WalkCoord | null = null;
 
     if (mode === 'custom_address' && customAddress) {
       locationInstruction = `СТАРТОВАЯ ТОЧКА: Адрес "${customAddress}".`;
+      // Try to geocode the custom address
+      startCoords = await forwardGeocode(customAddress);
     } else if (lat && lng) {
-      // Попытаемся получить точный адрес по координатам
+      startCoords = { lat, lng };
       resolvedAddress = await reverseGeocode(lat, lng);
       if (resolvedAddress) {
         locationInstruction = `СТАРТОВАЯ ТОЧКА: Адрес "${resolvedAddress}" (координаты ${lat}, ${lng}).`;
@@ -134,6 +169,14 @@ export const suggestWalkingRoutes = async (
       - Если это жилой район, выбери в качестве Точки Б: школу, ТЦ, станцию метро, памятник или перекресток крупных улиц.
       - "endLocation" НЕ ДОЛЖЕН совпадать со "startLocation". Это должна быть другая точка.
       - "title" придумай красивый, например "Прогулка до парка..." или "Круг через площадь...".
+      
+      КРИТИЧНО - КООРДИНАТЫ:
+      - Для КАЖДОЙ точки маршрута укажи ТОЧНЫЕ GPS-координаты (lat, lng).
+      - "startCoords": координаты стартовой точки
+      - "endCoords": координаты конечной точки (или точки разворота)
+      - "waypoints": массив из 1-3 промежуточных точек с координатами, через которые проходит маршрут
+      - Подбирай waypoints так, чтобы СУММАРНАЯ ПЕШЕХОДНАЯ ДИСТАНЦИЯ по всем точкам максимально точно составляла ${targetKm.toFixed(1)} км
+      - Координаты ДОЛЖНЫ быть реальными GPS-координатами существующих мест
 
       Верни СТРОГО валидный JSON массив из 4 объектов.
       ОТВЕТ ДОЛЖЕН БЫТЬ ТОЛЬКО JSON. БЕЗ MARKDOWN.
@@ -146,9 +189,15 @@ export const suggestWalkingRoutes = async (
           "estimatedSteps": ${stepsNeeded},
           "durationMinutes": ${Math.round(targetKm * 12)},
           "distanceKm": ${targetKm.toFixed(1)},
-          "startLocation": "Адрес старта (как в запросе)",
+          "startLocation": "Адрес старта",
           "endLocation": "Адрес финиша/разворота",
-          "isRoundTrip": true/false
+          "isRoundTrip": true/false,
+          "startCoords": { "lat": 55.123, "lng": 37.456 },
+          "endCoords": { "lat": 55.234, "lng": 37.567 },
+          "waypoints": [
+            { "lat": 55.150, "lng": 37.480 },
+            { "lat": 55.180, "lng": 37.510 }
+          ]
         }
       ]
     `;
@@ -197,6 +246,24 @@ export const suggestWalkingRoutes = async (
             isRoundTrip: shouldBeRoundTrip,
           };
         });
+      }
+
+      // Ensure startCoords is set from user location if AI didn't provide them
+      if (startCoords) {
+        routes = routes.map((r) => ({
+          ...r,
+          startCoords: r.startCoords || startCoords!,
+        }));
+      }
+
+      // Try to geocode endLocation if endCoords not provided
+      for (let i = 0; i < routes.length; i++) {
+        if (!routes[i].endCoords && routes[i].endLocation) {
+          const coords = await forwardGeocode(routes[i].endLocation);
+          if (coords) {
+            routes[i].endCoords = coords;
+          }
+        }
       }
 
       return routes;
